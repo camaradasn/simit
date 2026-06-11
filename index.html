@@ -604,46 +604,52 @@
             <div class="alertas" id="alertas-lista"></div>
         </div>
 
-        <!-- Alertas Automáticas CallMeBot -->
+        <!-- Alertas Automáticas Multi-Canal -->
         <div class="card">
             <div class="card-hdr">
                 <div class="card-title">🔔 Alertas Automáticas</div>
                 <span id="auto-alert-badge" style="font-size:.6rem;padding:2px 7px;border-radius:10px;font-weight:600;background:rgba(255,255,255,.08);color:var(--dim);">OFF</span>
             </div>
 
-            <!-- Tabs configuración / estado -->
-            <div style="display:flex;gap:3px;margin-bottom:8px;">
-                <button onclick="showTab('tab-config')" id="tbtn-config"
-                        style="flex:1;background:var(--accent);border:none;color:#fff;padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;font-weight:600;">⚙️ Config</button>
-                <button onclick="showTab('tab-activar')" id="tbtn-activar"
-                        style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;">🚀 Activar</button>
-                <button onclick="showTab('tab-ayuda')" id="tbtn-ayuda"
-                        style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;">❓ Ayuda</button>
+            <!-- Tabs canal -->
+            <div style="display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap;">
+                <button onclick="showAlertTab('atab-telegram')" id="atbtn-telegram"
+                    style="flex:1;min-width:60px;background:var(--accent);border:none;color:#fff;padding:4px 3px;border-radius:4px;font-size:.6rem;cursor:pointer;font-weight:600;">✈️ Telegram</button>
+                <button onclick="showAlertTab('atab-email')" id="atbtn-email"
+                    style="flex:1;min-width:60px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px 3px;border-radius:4px;font-size:.6rem;cursor:pointer;">📧 Email</button>
+                <button onclick="showAlertTab('atab-wa')" id="atbtn-wa"
+                    style="flex:1;min-width:60px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px 3px;border-radius:4px;font-size:.6rem;cursor:pointer;">💬 WhatsApp</button>
+                <button onclick="showAlertTab('atab-browser')" id="atbtn-browser"
+                    style="flex:1;min-width:60px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px 3px;border-radius:4px;font-size:.6rem;cursor:pointer;">🔔 Browser</button>
             </div>
 
-            <!-- TAB CONFIG -->
-            <div id="tab-config">
-                <!-- CallMeBot API Key -->
-                <div style="background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.25);border-radius:6px;padding:8px 10px;margin-bottom:7px;">
-                    <div style="font-size:.62rem;font-weight:700;color:#25d366;margin-bottom:5px;">📲 CallMeBot — WhatsApp API</div>
-                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Número (con código país):</label>
-                    <input type="tel" id="wa-numero" placeholder="+59170000000"
-                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;margin-bottom:5px;"/>
-                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">API Key de CallMeBot:</label>
-                    <div style="display:flex;gap:4px;">
-                        <input type="text" id="cmb-apikey" placeholder="Ej: 1234567"
-                               style="flex:1;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;"/>
-                        <button onclick="guardarConfigCallMeBot()" style="background:var(--accent);border:none;color:#fff;padding:5px 9px;border-radius:5px;font-size:.65rem;cursor:pointer;white-space:nowrap;">💾 Guardar</button>
+            <!-- ── TAB TELEGRAM ── -->
+            <div id="atab-telegram">
+                <div style="background:rgba(41,182,246,.08);border:1px solid rgba(41,182,246,.3);border-radius:6px;padding:9px 10px;margin-bottom:7px;">
+                    <div style="font-size:.62rem;font-weight:700;color:#29b6f6;margin-bottom:6px;">✈️ Telegram Bot — Gratuito, sin API key externa</div>
+                    <div style="font-size:.6rem;color:#a5d6a7;line-height:1.7;margin-bottom:7px;">
+                        1️⃣ Abre Telegram → busca <b style="color:#fff;">@BotFather</b><br>
+                        2️⃣ Envía <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px;">/newbot</code> → pon un nombre → recibe el <b style="color:#fff;">Token</b><br>
+                        3️⃣ Abre tu bot → envía cualquier mensaje<br>
+                        4️⃣ Obtén tu Chat ID con el botón de abajo
                     </div>
-                    <div id="cmb-guardado" style="font-size:.6rem;color:#66bb6a;margin-top:4px;display:none;">✓ Configuración guardada</div>
-                    <button onclick="probarCallMeBot()" id="btn-cmb-test"
-                            style="width:100%;margin-top:6px;background:rgba(37,211,102,.15);border:1px solid #25d366;color:#25d366;padding:6px;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:600;">
-                        📨 Enviar mensaje de prueba
-                    </button>
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Bot Token:</label>
+                    <input type="text" id="tg-token" placeholder="123456789:ABCdef..."
+                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;margin-bottom:5px;"/>
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Chat ID:</label>
+                    <div style="display:flex;gap:4px;margin-bottom:5px;">
+                        <input type="text" id="tg-chatid" placeholder="Ej: -1001234567890"
+                               style="flex:1;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;"/>
+                        <button onclick="obtenerChatId()" style="background:rgba(41,182,246,.2);border:1px solid #29b6f6;color:#29b6f6;padding:5px 8px;border-radius:5px;font-size:.62rem;cursor:pointer;white-space:nowrap;">🔍 Obtener</button>
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button onclick="guardarConfigTelegram()" style="flex:1;background:var(--accent);border:none;color:#fff;padding:6px;border-radius:5px;font-size:.65rem;cursor:pointer;font-weight:600;">💾 Guardar</button>
+                        <button onclick="probarTelegram()" id="btn-tg-test" style="flex:1;background:rgba(41,182,246,.15);border:1px solid #29b6f6;color:#29b6f6;padding:6px;border-radius:5px;font-size:.65rem;cursor:pointer;font-weight:600;">📨 Probar</button>
+                    </div>
+                    <div id="tg-guardado" style="font-size:.6rem;color:#66bb6a;margin-top:4px;display:none;">✓ Configuración guardada</div>
                 </div>
-
                 <!-- Umbrales -->
-                <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:4px;">⚙️ Umbrales para disparar alerta:</label>
+                <div style="font-size:.6rem;color:var(--dim);margin-bottom:4px;">⚙️ Umbrales:</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
                     <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px;">
                         <label style="font-size:.58rem;color:var(--dim);">Focos totales ≥</label>
@@ -666,46 +672,88 @@
                                style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:#fff;font-size:.85rem;font-weight:700;outline:none;margin-top:2px;"/>
                     </div>
                 </div>
+                <button onclick="toggleAlertasTelegram()" id="btn-auto-tg"
+                    style="width:100%;background:rgba(41,182,246,.15);border:1px solid #29b6f6;color:#29b6f6;padding:7px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
+                    🚀 Activar alertas Telegram automáticas
+                </button>
+                <div id="tg-alert-status" style="font-size:.62rem;color:var(--dim);margin-top:5px;line-height:1.5;"></div>
             </div>
 
-            <!-- TAB ACTIVAR -->
-            <div id="tab-activar" style="display:none;">
-                <div id="cmb-estado-config" style="font-size:.68rem;color:var(--dim);background:rgba(255,255,255,.03);border-radius:5px;padding:8px;margin-bottom:8px;line-height:1.7;"></div>
-                <div style="display:flex;flex-direction:column;gap:5px;">
-                    <button id="btn-notif-browser" onclick="activarNotificacionesBrowser()"
-                            style="background:rgba(9,132,227,.2);border:1px solid #0984e3;color:#74b9ff;padding:8px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
-                        🔔 Notificaciones del navegador
-                    </button>
-                    <button id="btn-auto-cmb" onclick="toggleCallMeBot()"
-                            style="background:rgba(37,211,102,.15);border:1px solid #25d366;color:#25d366;padding:8px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
-                        📲 Activar CallMeBot automático
+            <!-- ── TAB EMAIL ── -->
+            <div id="atab-email" style="display:none;">
+                <div style="background:rgba(255,183,77,.07);border:1px solid rgba(255,183,77,.3);border-radius:6px;padding:9px 10px;margin-bottom:7px;">
+                    <div style="font-size:.62rem;font-weight:700;color:#ffb74d;margin-bottom:5px;">📧 Alerta por Email — sin configuración</div>
+                    <div style="font-size:.6rem;color:#a5d6a7;line-height:1.7;margin-bottom:7px;">
+                        Abre tu cliente de correo con el resumen de focos listo para enviar. No requiere API key ni contraseña.
+                    </div>
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Email destinatario:</label>
+                    <input type="email" id="email-dest" placeholder="ejemplo@correo.com"
+                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;margin-bottom:6px;"/>
+                    <button onclick="enviarAlertaEmail()"
+                        style="width:100%;background:rgba(255,183,77,.2);border:1px solid #ffb74d;color:#ffb74d;padding:7px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
+                        📤 Abrir correo con alerta
                     </button>
                 </div>
-                <div id="auto-alert-status" style="font-size:.62rem;color:var(--dim);margin-top:7px;line-height:1.6;padding:6px 0;"></div>
+                <div style="font-size:.62rem;color:#81c784;line-height:1.6;padding:4px 0;">
+                    💡 <b style="color:#a5d6a7;">Recomendado:</b> configura una regla de reenvío desde Gmail/Outlook para recibir alertas en tu teléfono automáticamente.
+                </div>
             </div>
 
-            <!-- TAB AYUDA -->
-            <div id="tab-ayuda" style="display:none;">
-                <div style="font-size:.67rem;line-height:1.8;color:#a5d6a7;">
-                    <div style="font-weight:700;color:#66bb6a;margin-bottom:5px;">📋 Cómo obtener tu API Key:</div>
-                    <div style="background:rgba(255,255,255,.03);border-radius:5px;padding:8px;margin-bottom:6px;">
-                        <div>1️⃣ Abre WhatsApp y agrega el contacto:</div>
-                        <div style="color:#fff;font-weight:700;letter-spacing:.5px;margin:3px 0 3px 12px;">+34 644 65 21 91</div>
-                        <div>2️⃣ Envíale exactamente este mensaje:</div>
-                        <div style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:4px;padding:5px 8px;margin:3px 0 3px 0;font-family:monospace;color:#25d366;font-size:.65rem;">I allow callmebot to send me messages</div>
-                        <div>3️⃣ Recibirás un mensaje con tu <b style="color:#fff;">API Key</b></div>
-                        <div>4️⃣ Cópiala en la pestaña <b style="color:#fff;">Config</b></div>
+            <!-- ── TAB WHATSAPP ── -->
+            <div id="atab-wa" style="display:none;">
+                <div style="background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.25);border-radius:6px;padding:9px 10px;margin-bottom:7px;">
+                    <div style="font-size:.62rem;font-weight:700;color:#25d366;margin-bottom:5px;">💬 WhatsApp — Alerta manual inmediata</div>
+                    <div style="font-size:.6rem;color:#a5d6a7;line-height:1.6;margin-bottom:7px;">
+                        Genera el mensaje de alerta y ábrelo directamente en WhatsApp Web para enviarlo a quien quieras.
                     </div>
-                    <div style="color:#81c784;font-size:.62rem;">✅ Gratis · Sin registro · Solo WhatsApp personal<br>⚠️ El mensaje puede tardar ~2 minutos en llegar</div>
-                    <button onclick="abrirWhatsAppCallMeBot()" style="width:100%;margin-top:6px;background:rgba(37,211,102,.2);border:1px solid #25d366;color:#25d366;padding:7px;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:600;">
-                        💬 Abrir chat con CallMeBot en WhatsApp
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Número destino (opcional):</label>
+                    <input type="tel" id="wa-numero" placeholder="+59170000000"
+                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;margin-bottom:6px;"/>
+                    <button onclick="enviarAlertaWhatsAppDirecto()"
+                        style="width:100%;background:rgba(37,211,102,.2);border:1px solid #25d366;color:#25d366;padding:7px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;margin-bottom:5px;">
+                        📲 Abrir en WhatsApp Web
                     </button>
+                    <div style="font-size:.6rem;color:#81c784;line-height:1.5;">
+                        ⚠️ <b>CallMeBot</b> (alertas automáticas WA) requiere registro manual. Si no funciona, usa <b>Telegram</b> que es más confiable y completamente gratuito.
+                    </div>
+                </div>
+                <!-- CallMeBot legacy -->
+                <details style="margin-top:4px;">
+                    <summary style="font-size:.62rem;color:var(--dim);cursor:pointer;padding:4px 0;">🔧 Configuración avanzada CallMeBot (opcional)</summary>
+                    <div style="padding:8px 0;font-size:.62rem;color:#a5d6a7;">
+                        <label style="color:var(--dim);display:block;margin-bottom:3px;">API Key de CallMeBot:</label>
+                        <div style="display:flex;gap:4px;">
+                            <input type="text" id="cmb-apikey" placeholder="Ej: 1234567"
+                                   style="flex:1;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;"/>
+                            <button onclick="guardarConfigCallMeBot()" style="background:var(--accent);border:none;color:#fff;padding:5px 9px;border-radius:5px;font-size:.65rem;cursor:pointer;">💾</button>
+                        </div>
+                        <div id="cmb-guardado" style="font-size:.6rem;color:#66bb6a;margin-top:4px;display:none;">✓ Guardado</div>
+                        <button onclick="probarCallMeBot()" style="width:100%;margin-top:5px;background:rgba(37,211,102,.1);border:1px solid #25d366;color:#25d366;padding:5px;border-radius:5px;cursor:pointer;font-size:.65rem;">📨 Probar CallMeBot</button>
+                        <div style="margin-top:6px;color:#81c784;">Para obtener API Key: agrega <b style="color:#fff;">+34 644 65 21 91</b> en WhatsApp y envía: <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px;font-size:.6rem;">I allow callmebot to send me messages</code></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- ── TAB BROWSER ── -->
+            <div id="atab-browser" style="display:none;">
+                <div style="background:rgba(9,132,227,.07);border:1px solid rgba(9,132,227,.3);border-radius:6px;padding:9px 10px;margin-bottom:7px;">
+                    <div style="font-size:.62rem;font-weight:700;color:#74b9ff;margin-bottom:5px;">🔔 Notificaciones del navegador</div>
+                    <div style="font-size:.6rem;color:#a5d6a7;line-height:1.7;margin-bottom:7px;">
+                        Recibe alertas como notificaciones push del sistema, sin salir de esta app. Requiere que el navegador esté abierto.
+                    </div>
+                    <button id="btn-notif-browser" onclick="activarNotificacionesBrowser()"
+                        style="width:100%;background:rgba(9,132,227,.2);border:1px solid #0984e3;color:#74b9ff;padding:8px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;margin-bottom:5px;">
+                        🔔 Activar notificaciones del navegador
+                    </button>
+                    <button id="btn-auto-cmb" onclick="toggleCallMeBot()" style="display:none;"></button>
+                    <div id="auto-alert-status" style="font-size:.62rem;color:var(--dim);margin-top:5px;line-height:1.5;"></div>
                 </div>
             </div>
 
         </div>
             <div id="dept-list"><div class="loading"><div class="spin"></div>Cargando...</div></div>
         </div>
+
 
         <!-- Focos chart -->
         <div class="card">
@@ -1001,32 +1049,40 @@ let focosVentana = 24;   // horas activas: 24, 48 o 72
 let focosDataRaw = [];   // todos los focos crudos (72h)
 
 // ═══════════════════════════════════════════════════
-// POLÍGONO SIMPLIFICADO DE BOLIVIA — filtro geográfico
+// POLÍGONO DE BOLIVIA — filtro geográfico preciso
+// Formato: [lat, lng] — 60 vértices cubriendo frontera real
 // ═══════════════════════════════════════════════════
-// Polígono de Bolivia con ~40 vértices (simplificado pero preciso para excluir
-// países vecinos como Paraguay, Brasil, Perú, Chile, Argentina)
 const BOLIVIA_POLYGON = [
-    [-69.5,-16.7],[-69.6,-17.5],[-69.3,-18.2],[-68.9,-18.9],[-68.5,-19.4],
-    [-68.2,-20.1],[-67.9,-20.7],[-67.5,-21.5],[-67.0,-22.0],[-66.5,-22.3],
-    [-65.8,-22.4],[-65.0,-22.0],[-64.5,-22.5],[-63.7,-22.0],[-63.0,-21.8],
-    [-62.5,-21.5],[-62.0,-20.8],[-61.5,-20.0],[-60.8,-19.5],[-60.0,-19.3],
-    [-59.5,-18.9],[-58.5,-18.0],[-58.2,-17.5],[-58.0,-16.0],[-57.8,-14.5],
-    [-57.5,-13.5],[-57.8,-12.5],[-58.2,-11.5],[-59.0,-10.5],[-60.0,-10.0],
-    [-61.0,-9.7], [-62.0,-9.9], [-63.0,-10.2],[-64.0,-10.5],[-65.0,-10.8],
-    [-66.0,-11.0],[-67.0,-11.0],[-68.0,-11.2],[-68.7,-11.8],[-69.2,-12.5],
-    [-69.5,-13.5],[-69.6,-14.5],[-69.5,-15.5],[-69.5,-16.7]
+    // Norte: frontera con Perú y Brasil
+    [-9.78,-65.40],[-9.97,-65.28],[-10.10,-65.00],[-10.30,-64.50],
+    [-10.50,-64.00],[-10.70,-63.50],[-10.90,-63.00],[-11.10,-62.50],
+    [-11.30,-62.00],[-11.50,-61.50],[-11.70,-61.00],[-12.00,-60.60],
+    [-12.50,-60.40],[-13.00,-60.30],[-13.50,-60.30],[-13.90,-60.50],
+    [-14.50,-60.50],[-15.00,-60.10],[-15.50,-59.80],[-16.00,-59.00],
+    [-16.50,-58.60],[-17.00,-58.30],[-17.50,-58.30],[-18.00,-58.40],
+    [-18.50,-59.00],[-19.00,-59.50],[-19.50,-60.00],[-20.00,-61.00],
+    [-20.50,-61.50],[-21.00,-62.00],[-21.50,-62.60],[-21.90,-63.20],
+    [-22.00,-64.00],[-22.20,-64.60],[-22.40,-65.20],[-22.50,-65.80],
+    [-22.40,-66.50],[-22.10,-67.00],[-21.80,-67.50],[-21.50,-67.80],
+    [-21.00,-68.00],[-20.50,-68.20],[-20.00,-68.50],[-19.50,-68.70],
+    [-19.00,-68.90],[-18.50,-69.20],[-18.00,-69.50],[-17.50,-69.60],
+    [-17.00,-69.50],[-16.70,-69.40],[-16.50,-69.20],[-16.00,-69.10],
+    [-15.50,-69.20],[-15.00,-69.30],[-14.50,-69.10],[-14.00,-68.80],
+    [-13.50,-68.70],[-13.00,-68.60],[-12.50,-68.90],[-12.00,-68.70],
+    [-11.50,-67.80],[-11.00,-67.30],[-10.50,-66.60],[-10.00,-66.00],
+    [-9.78,-65.40]
 ];
 
 function isEnBolivia(lat, lng) {
     if (isNaN(lat) || isNaN(lng)) return false;
-    // Primero bbox rápido
+    // Bbox rápido primero
     if (lat < -22.9 || lat > -9.7 || lng < -69.6 || lng > -57.5) return false;
-    // Luego ray-casting sobre polígono simplificado
+    // Ray-casting: punto en polígono [lat, lng]
     let inside = false;
     const poly = BOLIVIA_POLYGON;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        const xi = poly[i][0], yi = poly[i][1];
-        const xj = poly[j][0], yj = poly[j][1];
+        const [yi, xi] = poly[i]; // lat_i, lng_i
+        const [yj, xj] = poly[j]; // lat_j, lng_j
         const intersect = ((yi > lat) !== (yj > lat)) &&
             (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
@@ -1034,44 +1090,84 @@ function isEnBolivia(lat, lng) {
     return inside;
 }
 
-async function fetchFocosNASA() {
+// ═══════════════════════════════════════════════════
+// NASA FIRMS — multi-fuente VIIRS+MODIS, períodos 24h/48h/72h
+// ═══════════════════════════════════════════════════
+let ultimaFetchTs = 0;
+
+const FIRMS_SOURCES = [
+    { id:'VIIRS_NOAA20_NRT', label:'VIIRS NOAA-20' },
+    { id:'VIIRS_SNPP_NRT',   label:'VIIRS S-NPP'   },
+    { id:'MODIS_NRT',        label:'MODIS'          },
+];
+
+function parsearFilaFoco(r, satLabel, ahora) {
+    const fecha   = r.acq_date || '';
+    const horaRaw = String(r.acq_time || '0').padStart(4,'0');
+    const hh = horaRaw.slice(0,2), mm = horaRaw.slice(2,4);
+    const dt  = fecha ? new Date(fecha + 'T' + hh + ':' + mm + ':00Z').getTime() : NaN;
+    const lat = parseFloat(r.latitude);
+    const lng = parseFloat(r.longitude);
+    return {
+        lat, lng,
+        brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
+        frp:        parseFloat(r.frp || 0),
+        fecha, hora: hh + ':' + mm,
+        satellite:  r.satellite || satLabel,
+        confidence: r.confidence || 'n',
+        ts:   dt,
+        edadH: isNaN(dt) ? 0 : (ahora - dt) / 3600000,
+    };
+}
+
+async function fetchUnaSrc(sourceId, dias) {
     const { west, south, east, north } = CFG.BBOX;
-    // Pedimos 3 días para tener 24h / 48h / 72h disponibles sin volver a pedir
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/3`;
+    const url = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv/' + CFG.NASA_KEY + '/' + sourceId + '/' + west + ',' + south + ',' + east + ',' + north + '/' + dias;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(sourceId + ' HTTP ' + resp.status);
+    const text = await resp.text();
+    const parsed = Papa.parse(text.trim(), { header:true, skipEmptyLines:true });
+    const label = (FIRMS_SOURCES.find(s => s.id === sourceId) || {}).label || sourceId;
+    return { rows: parsed.data, label };
+}
 
-    setAPIStatus('nasa', 'warn', 'Conectando...');
+async function fetchFocosNASA() {
+    setAPIStatus('nasa', 'warn', 'Actualizando...');
+    const ahora = Date.now();
+
     try {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const text = await resp.text();
-        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+        const resultados = await Promise.allSettled(
+            FIRMS_SOURCES.map(src => fetchUnaSrc(src.id, 3))
+        );
 
-        const ahora = Date.now();
-        focosDataRaw = parsed.data
-            .map(r => {
-                const fecha  = r.acq_date || '';
-                const horaRaw= String(r.acq_time || '0').padStart(4,'0');
-                const hh     = horaRaw.slice(0,2);
-                const mm     = horaRaw.slice(2,4);
-                const dt     = fecha ? new Date(`${fecha}T${hh}:${mm}:00Z`).getTime() : NaN;
-                const lat    = parseFloat(r.latitude);
-                const lng    = parseFloat(r.longitude);
-                return {
-                    lat, lng,
-                    brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
-                    frp:        parseFloat(r.frp || 0),
-                    fecha,
-                    hora:       `${hh}:${mm}`,
-                    satellite:  r.satellite || 'VIIRS',
-                    confidence: r.confidence || 'n',
-                    ts:         dt,
-                    edadH:      isNaN(dt) ? 0 : (ahora - dt) / 3600000,
-                };
-            })
-            // Filtro estricto dentro del territorio boliviano (polígono simplificado)
-            .filter(f => isEnBolivia(f.lat, f.lng));
+        // Deduplicar por posición+tiempo (distintos satélites detectan el mismo foco)
+        const mapa = new Map();
+        const srcActivos = [];
 
-        setAPIStatus('nasa', 'ok', `${focosDataRaw.length} focos (72h) ✓`);
+        resultados.forEach(res => {
+            if (res.status !== 'fulfilled') return;
+            const { rows, label } = res.value;
+            srcActivos.push(label.split(' ').slice(-1)[0]); // abreviatura
+            rows.forEach(r => {
+                const f = parsearFilaFoco(r, label, ahora);
+                if (isNaN(f.lat) || isNaN(f.lng) || !isEnBolivia(f.lat, f.lng)) return;
+                // key de deduplicación: celda ~500m + slot de 30 min
+                const key = f.lat.toFixed(2) + '_' + f.lng.toFixed(2) + '_' + Math.floor(f.ts / (30*60000));
+                if (!mapa.has(key) || f.frp > mapa.get(key).frp) mapa.set(key, f);
+            });
+        });
+
+        if (mapa.size === 0 && resultados.every(r => r.status === 'rejected')) {
+            throw new Error('Todas las fuentes fallaron');
+        }
+
+        focosDataRaw = Array.from(mapa.values());
+        ultimaFetchTs = ahora;
+
+        const n72 = focosDataRaw.length;
+        const n24 = focosDataRaw.filter(f => f.edadH <= 24).length;
+        const srcStr = srcActivos.join('+') || '?';
+        setAPIStatus('nasa', 'ok', n24 + ' focos/24h · ' + n72 + '/72h [' + srcStr + '] ✓');
         aplicarVentana();
         actualizarUltimaActualizacion();
 
@@ -1081,6 +1177,8 @@ async function fetchFocosNASA() {
         useDemoFocos();
     }
 }
+
+
 
 function aplicarVentana() {
     focosData = focosDataRaw.filter(f => f.edadH <= focosVentana);
@@ -1113,10 +1211,10 @@ function actualizarBotonesVentana() {
 function actualizarUltimaActualizacion() {
     const el = document.getElementById('focos-ts');
     if (el) el.textContent = 'Act: ' + new Date().toLocaleTimeString('es-BO', {hour:'2-digit',minute:'2-digit'});
-    // Próxima actualización en 6h
+    // Próxima actualización en 12h
     const prox = document.getElementById('focos-prox');
     if (prox) {
-        const next = new Date(Date.now() + 6*3600000);
+        const next = new Date(Date.now() + 12*3600000);
         prox.textContent = 'Próx: ' + next.toLocaleTimeString('es-BO', {hour:'2-digit',minute:'2-digit'});
     }
 }
@@ -1935,6 +2033,177 @@ function actualizarEstadoConfig() {
 }
 
 // ── Guardar config ────────────────────────────────
+// ── Tabs de alertas multi-canal ──────────────────────────
+function showAlertTab(tabId) {
+    ['atab-telegram','atab-email','atab-wa','atab-browser'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === tabId ? '' : 'none';
+    });
+    ['atbtn-telegram','atbtn-email','atbtn-wa','atbtn-browser'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const active = id === tabId.replace('atab-','atbtn-');
+        btn.style.background = active ? 'var(--accent)' : 'rgba(255,255,255,.05)';
+        btn.style.color       = active ? '#fff' : 'var(--dim)';
+        btn.style.border      = active ? 'none' : '1px solid var(--border)';
+    });
+}
+
+// ── Telegram Bot ─────────────────────────────────────────
+function guardarConfigTelegram() {
+    const token  = (document.getElementById('tg-token')  || {}).value?.trim() || '';
+    const chatid = (document.getElementById('tg-chatid') || {}).value?.trim() || '';
+    if (!token || !chatid) { alert('Completa el Token y el Chat ID'); return; }
+    localStorage.setItem('simt_tg_token',  token);
+    localStorage.setItem('simt_tg_chatid', chatid);
+    const el = document.getElementById('tg-guardado');
+    if (el) { el.style.display='block'; setTimeout(()=>el.style.display='none', 2500); }
+}
+
+async function enviarTelegram(msg) {
+    const token  = localStorage.getItem('simt_tg_token')  || '';
+    const chatid = localStorage.getItem('simt_tg_chatid') || '';
+    if (!token || !chatid) return { ok:false, err:'Sin configurar' };
+    try {
+        const r = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify({ chat_id:chatid, text:msg, parse_mode:'Markdown' })
+        });
+        const data = await r.json();
+        return { ok: data.ok, err: data.description || '' };
+    } catch(e) { return { ok:false, err:e.message }; }
+}
+
+async function probarTelegram() {
+    guardarConfigTelegram();
+    const btn = document.getElementById('btn-tg-test');
+    if (btn) { btn.textContent='⏳ Enviando...'; btn.disabled=true; }
+    const total = focosData.length;
+    const msg = '🔥 *SIMT — Prueba de Alertas*\n📡 Bolivia · Ventana ' + focosVentana + 'h\nFocos activos: *' + total + '*\n✅ Canal Telegram funcionando correctamente.';
+    const res = await enviarTelegram(msg);
+    if (btn) {
+        btn.textContent = res.ok ? '✅ Enviado!' : '❌ Error: ' + res.err;
+        btn.disabled = false;
+        setTimeout(() => { btn.textContent = '📨 Probar'; }, 3000);
+    }
+}
+
+async function obtenerChatId() {
+    const token = (document.getElementById('tg-token') || {}).value?.trim() || localStorage.getItem('simt_tg_token') || '';
+    if (!token) { alert('Primero ingresa el Token del bot'); return; }
+    try {
+        const r = await fetch('https://api.telegram.org/bot' + token + '/getUpdates');
+        const data = await r.json();
+        if (!data.ok) { alert('Token inválido: ' + (data.description||'')); return; }
+        const updates = data.result;
+        if (!updates || !updates.length) {
+            alert('No se encontraron mensajes.\nAbre tu bot en Telegram y envíale cualquier mensaje, luego vuelve a intentar.');
+            return;
+        }
+        const chatId = updates[updates.length-1]?.message?.chat?.id
+                    || updates[updates.length-1]?.channel_post?.chat?.id;
+        if (chatId) {
+            const el = document.getElementById('tg-chatid');
+            if (el) el.value = String(chatId);
+            alert('✅ Chat ID encontrado: ' + chatId + '\nHaz clic en Guardar para confirmarlo.');
+        } else {
+            alert('No se pudo determinar el Chat ID. Envía un mensaje a tu bot primero.');
+        }
+    } catch(e) { alert('Error: ' + e.message); }
+}
+
+let tgAlertActivo = false;
+let tgAlertInterval = null;
+
+function toggleAlertasTelegram() {
+    const token  = localStorage.getItem('simt_tg_token')  || '';
+    const chatid = localStorage.getItem('simt_tg_chatid') || '';
+    if (!token || !chatid) { alert('Configura el Token y el Chat ID primero y guárdalos.'); return; }
+
+    tgAlertActivo = !tgAlertActivo;
+    const btn = document.getElementById('btn-auto-tg');
+    const badge = document.getElementById('auto-alert-badge');
+    const status = document.getElementById('tg-alert-status');
+
+    if (tgAlertActivo) {
+        const mins = parseInt(document.getElementById('umbral-intervalo')?.value) || 30;
+        tgAlertInterval = setInterval(verificarAlertasTelegram, mins * 60000);
+        if (btn) { btn.textContent='⏹ Desactivar alertas Telegram'; btn.style.background='rgba(198,40,40,.2)'; btn.style.borderColor='var(--red)'; btn.style.color='#ff6b6b'; }
+        if (badge) { badge.textContent='TG ON'; badge.style.background='rgba(41,182,246,.2)'; badge.style.color='#29b6f6'; }
+        if (status) status.textContent = '✅ Alertas Telegram activas · cada ' + mins + ' min';
+    } else {
+        clearInterval(tgAlertInterval);
+        if (btn) { btn.textContent='🚀 Activar alertas Telegram automáticas'; btn.style.background='rgba(41,182,246,.15)'; btn.style.borderColor='#29b6f6'; btn.style.color='#29b6f6'; }
+        if (badge) { badge.textContent='OFF'; badge.style.background='rgba(255,255,255,.08)'; badge.style.color='var(--dim)'; }
+        if (status) status.textContent = '';
+    }
+}
+
+async function verificarAlertasTelegram() {
+    const total = focosData.length;
+    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const ult6h = focosData.filter(f => (f.edadH||99) <= 6).length;
+    const umbT  = parseInt(document.getElementById('umbral-total')?.value) || 30;
+    const umbA  = parseInt(document.getElementById('umbral-alta')?.value)  || 5;
+    const umb6  = parseInt(document.getElementById('umbral-6h')?.value)    || 10;
+    if (total < umbT && alta < umbA && ult6h < umb6) return;
+
+    const nivel = alta>10||total>80 ? '🔴 CRÍTICO' : alta>5||total>30 ? '🟠 ALTO' : '🟡 MODERADO';
+    const ahora = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const msg = '🔥 *ALERTA SIMT — Camaradas de la Naturaleza*\n📅 ' + ahora + ' (Bolivia)\n⚠️ Nivel: *' + nivel + '*\n\n📊 *Focos detectados (ventana ' + focosVentana + 'h):*\n• Total: *' + total + '*  · Últimas 6h: *' + ult6h + '*\n• Alta intensidad: *' + alta + '* 🔴\n\n📡 NASA FIRMS VIIRS NOAA-20 + S-NPP + MODIS\n🌐 SIMT Bolivia';
+    await enviarTelegram(msg);
+}
+
+// ── Email alerta ──────────────────────────────────────────
+function enviarAlertaEmail() {
+    const dest  = (document.getElementById('email-dest') || {}).value?.trim() || '';
+    const total = focosData.length;
+    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const ult6h = focosData.filter(f => (f.edadH||99) <= 6).length;
+    const nivel = alta>10||total>80 ? 'CRÍTICO' : alta>5||total>30 ? 'ALTO' : total>0 ? 'MODERADO' : 'BAJO';
+    const ahora = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz'});
+    const asunto = encodeURIComponent('🔥 SIMT — Alerta Focos Bolivia · ' + nivel + ' · ' + new Date().toLocaleDateString('es-BO'));
+    const cuerpo = encodeURIComponent(
+        'ALERTA SIMT — Camaradas de la Naturaleza\n' +
+        'Generado: ' + ahora + '\n\n' +
+        'Nivel de alerta: ' + nivel + '\n' +
+        'Ventana temporal: ' + focosVentana + 'h\n\n' +
+        'FOCOS DE CALOR DETECTADOS:\n' +
+        '  Total: ' + total + '\n' +
+        '  Últimas 6h: ' + ult6h + '\n' +
+        '  Alta intensidad (>380K): ' + alta + '\n\n' +
+        'Fuente: NASA FIRMS VIIRS NOAA-20 + S-NPP + MODIS\n' +
+        'Sistema Integral de Monitoreo de Incendios y Territorio (SIMT)\n' +
+        'Camaradas de la Naturaleza · Bolivia'
+    );
+    const mailtoUrl = 'mailto:' + (dest || '') + '?subject=' + asunto + '&body=' + cuerpo;
+    window.open(mailtoUrl, '_blank');
+}
+
+// ── WhatsApp directo (sin CallMeBot) ─────────────────────
+function enviarAlertaWhatsAppDirecto() {
+    const num   = (document.getElementById('wa-numero') || {}).value?.trim() || '';
+    const total = focosData.length;
+    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const ult6h = focosData.filter(f => (f.edadH||99) <= 6).length;
+    const nivel = alta>10||total>80 ? '🔴 CRÍTICO' : alta>5||total>30 ? '🟠 ALTO' : '🟡 MODERADO';
+    const ahora = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const msg = '🔥 *ALERTA SIMT — Camaradas de la Naturaleza*\n📅 ' + ahora + '\n⚠️ Nivel: *' + nivel + '*\n\nFocos: *' + total + '* (6h: ' + ult6h + ' · Alta: ' + alta + ')\n\nFuente: NASA FIRMS · Ventana ' + focosVentana + 'h';
+    const base = num ? 'https://wa.me/' + num.replace(/\D/g,'') : 'https://wa.me/';
+    window.open(base + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// Cargar config guardada de Telegram en los inputs
+function cargarConfigTelegram() {
+    const token  = localStorage.getItem('simt_tg_token')  || '';
+    const chatid = localStorage.getItem('simt_tg_chatid') || '';
+    const tEl = document.getElementById('tg-token');
+    const cEl = document.getElementById('tg-chatid');
+    if (tEl && token)  tEl.value = token;
+    if (cEl && chatid) cEl.value = chatid;
+}
+
 function guardarConfigCallMeBot() {
     const num    = document.getElementById('wa-numero').value.trim();
     const apikey = document.getElementById('cmb-apikey').value.trim();
@@ -2167,6 +2436,11 @@ async function verificarAlertasAutomaticas() {
             setAutoStatus(`⚠️ Error al enviar CallMeBot: ${result.error}\nSe reintentará en ${mins} min`);
         }
     }
+
+    // 3. Telegram (si está activo)
+    if (tgAlertActivo) {
+        await enviarTelegram(msg);
+    }
 }
 
 
@@ -2199,10 +2473,11 @@ async function refreshFocos() {
 // ═══════════════════════════════════════════════════
 async function init() {
     cargarNumeroGuardado();
+    cargarConfigTelegram();
     await fetchClima('Santa Cruz de la Sierra', null);
     await fetchFocosNASA();
-    // Focos cada 6 horas (NASA FIRMS actualiza ~4 veces/día)
-    setInterval(refreshFocos, 6 * 60 * 60 * 1000);
+    // Focos cada 12 horas (NASA FIRMS VIIRS actualiza ~2 veces/día por satélite)
+    setInterval(refreshFocos, 12 * 60 * 60 * 1000);
     // Clima cada 30 min
     setInterval(() => fetchClima('Santa Cruz de la Sierra', null), 30 * 60 * 1000);
 }
@@ -2703,4 +2978,6 @@ init();
 </script>
 </body>
 </html>
+
+
 
