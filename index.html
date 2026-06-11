@@ -365,6 +365,13 @@
     <!-- Logo derecho SIMT -->
     <div style="display:flex;align-items:center;gap:15px;z-index:1;">
 
+        <!-- Reloj central -->
+        <div style="text-align:center;padding:0 18px;border-left:1px solid rgba(46,125,50,.4);border-right:1px solid rgba(46,125,50,.4);">
+            <div id="clock-time" style="font-size:1.35rem;font-weight:700;color:#fff;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1.1;">--:--:--</div>
+            <div id="clock-date" style="font-size:.65rem;color:#81c784;letter-spacing:.5px;margin-top:2px;">-- -- ----</div>
+            <div style="font-size:.58rem;color:#4caf50;letter-spacing:1px;">🕐 Hora Bolivia (GMT-4)</div>
+        </div>
+
         <div style="text-align:right;font-size:.7rem;color:#a5d6a7;">
             SIMT<br>
             <span style="font-size:.65rem;color:#66bb6a;">Incendios & Territorio</span>
@@ -507,6 +514,7 @@
                 <span style="font-size:.62rem;color:var(--dim);padding:5px 4px 5px 6px;">⏱️</span>
                 <button class="mbtn btn-ventana active" id="btn-v24" onclick="setVentana(24,this)">24 h</button>
                 <button class="mbtn btn-ventana"        id="btn-v48" onclick="setVentana(48,this)">48 h</button>
+                <button class="mbtn btn-ventana"        id="btn-v72" onclick="setVentana(72,this)">72 h</button>
                 <span style="font-size:.6rem;color:var(--dim);padding:5px 6px 5px 2px;" id="focos-prox"></span>
             </div>
         </div>
@@ -596,9 +604,106 @@
             <div class="alertas" id="alertas-lista"></div>
         </div>
 
-        <!-- Por departamento -->
+        <!-- Alertas Automáticas CallMeBot -->
         <div class="card">
-            <div class="card-hdr"><div class="card-title">🗺️ Por Departamento</div></div>
+            <div class="card-hdr">
+                <div class="card-title">🔔 Alertas Automáticas</div>
+                <span id="auto-alert-badge" style="font-size:.6rem;padding:2px 7px;border-radius:10px;font-weight:600;background:rgba(255,255,255,.08);color:var(--dim);">OFF</span>
+            </div>
+
+            <!-- Tabs configuración / estado -->
+            <div style="display:flex;gap:3px;margin-bottom:8px;">
+                <button onclick="showTab('tab-config')" id="tbtn-config"
+                        style="flex:1;background:var(--accent);border:none;color:#fff;padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;font-weight:600;">⚙️ Config</button>
+                <button onclick="showTab('tab-activar')" id="tbtn-activar"
+                        style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;">🚀 Activar</button>
+                <button onclick="showTab('tab-ayuda')" id="tbtn-ayuda"
+                        style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--dim);padding:4px;border-radius:4px;font-size:.63rem;cursor:pointer;">❓ Ayuda</button>
+            </div>
+
+            <!-- TAB CONFIG -->
+            <div id="tab-config">
+                <!-- CallMeBot API Key -->
+                <div style="background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.25);border-radius:6px;padding:8px 10px;margin-bottom:7px;">
+                    <div style="font-size:.62rem;font-weight:700;color:#25d366;margin-bottom:5px;">📲 CallMeBot — WhatsApp API</div>
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">Número (con código país):</label>
+                    <input type="tel" id="wa-numero" placeholder="+59170000000"
+                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;margin-bottom:5px;"/>
+                    <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:3px;">API Key de CallMeBot:</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="text" id="cmb-apikey" placeholder="Ej: 1234567"
+                               style="flex:1;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 8px;border-radius:5px;font-size:.7rem;outline:none;"/>
+                        <button onclick="guardarConfigCallMeBot()" style="background:var(--accent);border:none;color:#fff;padding:5px 9px;border-radius:5px;font-size:.65rem;cursor:pointer;white-space:nowrap;">💾 Guardar</button>
+                    </div>
+                    <div id="cmb-guardado" style="font-size:.6rem;color:#66bb6a;margin-top:4px;display:none;">✓ Configuración guardada</div>
+                    <button onclick="probarCallMeBot()" id="btn-cmb-test"
+                            style="width:100%;margin-top:6px;background:rgba(37,211,102,.15);border:1px solid #25d366;color:#25d366;padding:6px;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:600;">
+                        📨 Enviar mensaje de prueba
+                    </button>
+                </div>
+
+                <!-- Umbrales -->
+                <label style="font-size:.6rem;color:var(--dim);display:block;margin-bottom:4px;">⚙️ Umbrales para disparar alerta:</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+                    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px;">
+                        <label style="font-size:.58rem;color:var(--dim);">Focos totales ≥</label>
+                        <input type="number" id="umbral-total" value="30" min="1" max="500"
+                               style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:#fff;font-size:.85rem;font-weight:700;outline:none;margin-top:2px;"/>
+                    </div>
+                    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px;">
+                        <label style="font-size:.58rem;color:var(--dim);">Alta intensidad ≥</label>
+                        <input type="number" id="umbral-alta" value="5" min="1" max="200"
+                               style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:#fff;font-size:.85rem;font-weight:700;outline:none;margin-top:2px;"/>
+                    </div>
+                    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px;">
+                        <label style="font-size:.58rem;color:var(--dim);">Últimas 6h ≥</label>
+                        <input type="number" id="umbral-6h" value="10" min="1" max="200"
+                               style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:#fff;font-size:.85rem;font-weight:700;outline:none;margin-top:2px;"/>
+                    </div>
+                    <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:5px;padding:6px 8px;">
+                        <label style="font-size:.58rem;color:var(--dim);">Cada (minutos)</label>
+                        <input type="number" id="umbral-intervalo" value="30" min="5" max="1440"
+                               style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:#fff;font-size:.85rem;font-weight:700;outline:none;margin-top:2px;"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB ACTIVAR -->
+            <div id="tab-activar" style="display:none;">
+                <div id="cmb-estado-config" style="font-size:.68rem;color:var(--dim);background:rgba(255,255,255,.03);border-radius:5px;padding:8px;margin-bottom:8px;line-height:1.7;"></div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                    <button id="btn-notif-browser" onclick="activarNotificacionesBrowser()"
+                            style="background:rgba(9,132,227,.2);border:1px solid #0984e3;color:#74b9ff;padding:8px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
+                        🔔 Notificaciones del navegador
+                    </button>
+                    <button id="btn-auto-cmb" onclick="toggleCallMeBot()"
+                            style="background:rgba(37,211,102,.15);border:1px solid #25d366;color:#25d366;padding:8px;border-radius:5px;cursor:pointer;font-size:.7rem;font-weight:600;">
+                        📲 Activar CallMeBot automático
+                    </button>
+                </div>
+                <div id="auto-alert-status" style="font-size:.62rem;color:var(--dim);margin-top:7px;line-height:1.6;padding:6px 0;"></div>
+            </div>
+
+            <!-- TAB AYUDA -->
+            <div id="tab-ayuda" style="display:none;">
+                <div style="font-size:.67rem;line-height:1.8;color:#a5d6a7;">
+                    <div style="font-weight:700;color:#66bb6a;margin-bottom:5px;">📋 Cómo obtener tu API Key:</div>
+                    <div style="background:rgba(255,255,255,.03);border-radius:5px;padding:8px;margin-bottom:6px;">
+                        <div>1️⃣ Abre WhatsApp y agrega el contacto:</div>
+                        <div style="color:#fff;font-weight:700;letter-spacing:.5px;margin:3px 0 3px 12px;">+34 644 65 21 91</div>
+                        <div>2️⃣ Envíale exactamente este mensaje:</div>
+                        <div style="background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:4px;padding:5px 8px;margin:3px 0 3px 0;font-family:monospace;color:#25d366;font-size:.65rem;">I allow callmebot to send me messages</div>
+                        <div>3️⃣ Recibirás un mensaje con tu <b style="color:#fff;">API Key</b></div>
+                        <div>4️⃣ Cópiala en la pestaña <b style="color:#fff;">Config</b></div>
+                    </div>
+                    <div style="color:#81c784;font-size:.62rem;">✅ Gratis · Sin registro · Solo WhatsApp personal<br>⚠️ El mensaje puede tardar ~2 minutos en llegar</div>
+                    <button onclick="abrirWhatsAppCallMeBot()" style="width:100%;margin-top:6px;background:rgba(37,211,102,.2);border:1px solid #25d366;color:#25d366;padding:7px;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:600;">
+                        💬 Abrir chat con CallMeBot en WhatsApp
+                    </button>
+                </div>
+            </div>
+
+        </div>
             <div id="dept-list"><div class="loading"><div class="spin"></div>Cargando...</div></div>
         </div>
 
@@ -627,8 +732,14 @@
 
     <!-- Cabecera modal -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#071a12;border-bottom:2px solid #1b5e20;">
-      <span style="font-weight:700;color:#a5d6a7;font-size:.95rem;">📄 Generar Reporte</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-weight:700;color:#a5d6a7;font-size:.95rem;">📄 Generar Reporte</span>
+        <select id="rpt-kml-filtro" style="background:#0c2d1f;border:1px solid #1b5e20;color:#a5d6a7;padding:5px 8px;border-radius:5px;font-size:.72rem;outline:none;" onchange="poblarReporte()">
+          <option value="">🇧🇴 Bolivia completa</option>
+        </select>
+      </div>
       <div style="display:flex;gap:8px;">
+        <button onclick="enviarAlertaWhatsApp()" style="background:#25d366;border:none;color:#fff;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;">📲 Enviar Alerta WA</button>
         <button onclick="descargarPNG()" style="background:#0984e3;border:none;color:#fff;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;">🖼️ Descargar PNG</button>
         <button onclick="descargarPDF()" style="background:#2e7d32;border:none;color:#fff;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;">📑 Descargar PDF</button>
         <button onclick="cerrarReporte()" style="background:rgba(255,255,255,.07);border:1px solid #1b5e20;color:#81c784;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;">✕ Cerrar</button>
@@ -657,7 +768,8 @@
         </div>
       </div>
 
-      <div style="font-size:.88rem;font-weight:700;color:#66bb6a;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">Reporte de Situación — Focos de Calor y Condiciones Ambientales</div>
+      <div style="font-size:.88rem;font-weight:700;color:#66bb6a;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">Reporte de Situación — Focos de Calor y Condiciones Ambientales</div>
+      <div style="font-size:.72rem;color:#81c784;margin-bottom:14px;" id="rpt-area-label">Área: Bolivia · Ventana: 24h</div>
 
       <!-- SECCIÓN 1: FOCOS -->
       <div style="background:#0c2d1f;border:1px solid #1b5e20;border-radius:8px;padding:14px 16px;margin-bottom:14px;">
@@ -711,7 +823,20 @@
         <div style="margin-top:10px;" id="rpt-riesgo-bloque"></div>
       </div>
 
-      <!-- SECCIÓN 3: CAPAS KML -->
+      <!-- SECCIÓN 3.5: MAPA DE FOCOS -->
+      <div style="background:#0c2d1f;border:1px solid #1b5e20;border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+        <div style="font-size:.72rem;font-weight:700;color:#66bb6a;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+          <span style="display:block;width:3px;height:12px;background:#43a047;border-radius:2px;"></span>
+          🗺️ Mapa de Focos de Calor
+        </div>
+        <div id="rpt-mapa-container" style="width:100%;height:320px;border-radius:6px;overflow:hidden;background:#060d18;position:relative;">
+          <div id="rpt-mapa" style="width:100%;height:100%;"></div>
+          <div id="rpt-mapa-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,13,24,.8);color:#81c784;font-size:.78rem;">🗺️ Cargando mapa...</div>
+        </div>
+        <div style="font-size:.63rem;color:#81c784;margin-top:6px;text-align:center;" id="rpt-mapa-nota">Mapa generado al abrir el reporte · Base: ESRI World Imagery</div>
+      </div>
+
+      <!-- SECCIÓN 4: CAPAS KML -->
       <div style="background:#0c2d1f;border:1px solid #1b5e20;border-radius:8px;padding:14px 16px;margin-bottom:14px;" id="rpt-kml-seccion">
         <div style="font-size:.72rem;font-weight:700;color:#66bb6a;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
           <span style="display:block;width:3px;height:12px;background:#43a047;border-radius:2px;"></span>
@@ -872,13 +997,13 @@ function toggleKMLGroup(tipo, btn) {
 // ═══════════════════════════════════════════════════
 // NASA FIRMS — FOCOS REALES (ventana 24h / 48h)
 // ═══════════════════════════════════════════════════
-let focosVentana = 24;   // horas activas: 24 o 48
-let focosDataRaw = [];   // todos los focos crudos (48h)
+let focosVentana = 24;   // horas activas: 24, 48 o 72
+let focosDataRaw = [];   // todos los focos crudos (72h)
 
 async function fetchFocosNASA() {
     const { west, south, east, north } = CFG.BBOX;
-    // Pedimos 2 días para tener tanto 24h como 48h disponibles sin volver a pedir
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/2`;
+    // Pedimos 3 días para tener 24h / 48h / 72h disponibles sin volver a pedir
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/3`;
 
     setAPIStatus('nasa', 'warn', 'Conectando...');
     try {
@@ -895,9 +1020,10 @@ async function fetchFocosNASA() {
                 const hh     = horaRaw.slice(0,2);
                 const mm     = horaRaw.slice(2,4);
                 const dt     = fecha ? new Date(`${fecha}T${hh}:${mm}:00Z`).getTime() : NaN;
+                const lat    = parseFloat(r.latitude);
+                const lng    = parseFloat(r.longitude);
                 return {
-                    lat:        parseFloat(r.latitude),
-                    lng:        parseFloat(r.longitude),
+                    lat, lng,
                     brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
                     frp:        parseFloat(r.frp || 0),
                     fecha,
@@ -908,9 +1034,15 @@ async function fetchFocosNASA() {
                     edadH:      isNaN(dt) ? 0 : (ahora - dt) / 3600000,
                 };
             })
-            .filter(f => !isNaN(f.lat) && !isNaN(f.lng));
+            // Filtro estricto dentro del territorio boliviano
+            .filter(f => {
+                const { west, south, east, north } = CFG.BBOX;
+                return !isNaN(f.lat) && !isNaN(f.lng)
+                    && f.lat >= south && f.lat <= north
+                    && f.lng >= west  && f.lng <= east;
+            });
 
-        setAPIStatus('nasa', 'ok', `${focosDataRaw.length} focos (48h) ✓`);
+        setAPIStatus('nasa', 'ok', `${focosDataRaw.length} focos (72h) ✓`);
         aplicarVentana();
         actualizarUltimaActualizacion();
 
@@ -940,10 +1072,13 @@ function setVentana(horas, btn) {
 function actualizarBotonesVentana() {
     const t24 = focosDataRaw.filter(f => f.edadH <= 24).length;
     const t48 = focosDataRaw.filter(f => f.edadH <= 48).length;
+    const t72 = focosDataRaw.filter(f => f.edadH <= 72).length;
     const b24 = document.getElementById('btn-v24');
     const b48 = document.getElementById('btn-v48');
+    const b72 = document.getElementById('btn-v72');
     if (b24) b24.title = `${t24} focos en últimas 24h`;
     if (b48) b48.title = `${t48} focos en últimas 48h`;
+    if (b72) b72.title = `${t72} focos en últimas 72h`;
 }
 
 function actualizarUltimaActualizacion() {
@@ -980,7 +1115,7 @@ function useDemoFocos() {
         for (const z of zonas) { acc+=z.p; if(rand<acc){zona=z;break;} }
         const angle=Math.random()*2*Math.PI, dist=Math.random()*zona.r;
         // edadH distribuida entre 0 y 48h
-        const edadH = Math.random() * 48;
+        const edadH = Math.random() * 72;
         const ts    = ahora - edadH * 3600000;
         const d     = new Date(ts);
         const hh    = String(d.getUTCHours()).padStart(2,'0');
@@ -1009,11 +1144,12 @@ function useDemoFocos() {
 // RENDER FOCOS EN MAPA — color por antigüedad
 // ═══════════════════════════════════════════════════
 function getColorPorEdad(edadH) {
-    // 0-6h → rojo vivo · 6-24h → naranja · 24-48h → amarillo
-    if (edadH <= 6)  return { color:'#ff0000', fill:'#ff2200', r:9,  label:'< 6 h'   };
+    // 0-6h → rojo vivo · 6-24h → naranja · 24-48h → amarillo · 48-72h → gris claro
+    if (edadH <= 6)  return { color:'#ff0000', fill:'#ff2200', r:9,  label:'< 6 h'    };
     if (edadH <= 12) return { color:'#ff6000', fill:'#ff7700', r:8,  label:'6 – 12 h' };
     if (edadH <= 24) return { color:'#ffa500', fill:'#ffb800', r:7,  label:'12 – 24 h'};
-    return                   { color:'#cccc00', fill:'#e8e800', r:5,  label:'24 – 48 h'};
+    if (edadH <= 48) return { color:'#cccc00', fill:'#e8e800', r:5,  label:'24 – 48 h'};
+    return                   { color:'#888888', fill:'#aaaaaa', r:4,  label:'48 – 72 h'};
 }
 
 function renderFocos() {
@@ -1056,7 +1192,8 @@ function actualizarLeyendaTemporal() {
         <div class="leg-row"><div class="leg-dot" style="background:#ff2200;border-color:#ff0000;"></div><span>Últimas 6 h</span></div>
         <div class="leg-row"><div class="leg-dot" style="background:#ff7700;border-color:#ff6000;"></div><span>6 – 12 h</span></div>
         <div class="leg-row"><div class="leg-dot" style="background:#ffb800;border-color:#ffa500;"></div><span>12 – 24 h</span></div>
-        ${focosVentana===48?'<div class="leg-row"><div class="leg-dot" style="background:#e8e800;border-color:#cccc00;"></div><span>24 – 48 h</span></div>':''}`;
+        ${focosVentana>=48?'<div class="leg-row"><div class="leg-dot" style="background:#e8e800;border-color:#cccc00;"></div><span>24 – 48 h</span></div>':''}
+        ${focosVentana>=72?'<div class="leg-row"><div class="leg-dot" style="background:#aaaaaa;border-color:#888888;"></div><span>48 – 72 h</span></div>':''}`;
 }
 
 function buildPopup(f, cfg) {
@@ -1720,13 +1857,293 @@ function setAPIStatus(api, status, text) {
 }
 
 // ═══════════════════════════════════════════════════
-// RELOJ
+// SISTEMA DE ALERTAS AUTOMÁTICAS — CALLMEBOT + BROWSER
 // ═══════════════════════════════════════════════════
-function updateClock() {
-    document.getElementById('clock').textContent = new Date().toLocaleString('es-BO', {
-        timeZone:'America/La_Paz', day:'2-digit', month:'2-digit', year:'numeric',
-        hour:'2-digit', minute:'2-digit', second:'2-digit'
+let autoAlertCMBActivo     = false;
+let autoAlertBrowserActivo = false;
+let autoAlertIntervalId    = null;
+let ultimaAlertaTs         = 0;
+let ultimoEstadoFocos      = 0;
+
+// ── Tabs UI ──────────────────────────────────────
+function showTab(tabId) {
+    ['tab-config','tab-activar','tab-ayuda'].forEach(id => {
+        document.getElementById(id).style.display = id === tabId ? '' : 'none';
     });
+    ['tbtn-config','tbtn-activar','tbtn-ayuda'].forEach(id => {
+        const btn = document.getElementById(id);
+        const isActive = id === tabId.replace('tab-','tbtn-');
+        btn.style.background = isActive ? 'var(--accent)' : 'rgba(255,255,255,.05)';
+        btn.style.color = isActive ? '#fff' : 'var(--dim)';
+        btn.style.border = isActive ? 'none' : '1px solid var(--border)';
+    });
+    if (tabId === 'tab-activar') actualizarEstadoConfig();
+}
+
+function actualizarEstadoConfig() {
+    const num    = localStorage.getItem('simt_wa_numero') || '';
+    const apikey = localStorage.getItem('simt_cmb_apikey') || '';
+    const el     = document.getElementById('cmb-estado-config');
+    if (!el) return;
+    const numOk = num.length > 7;
+    const keyOk = apikey.length > 3;
+    el.innerHTML = `
+        <div>${numOk ? '✅' : '❌'} Número: <b style="color:#fff;">${numOk ? num : 'No configurado'}</b></div>
+        <div>${keyOk ? '✅' : '❌'} API Key CallMeBot: <b style="color:#fff;">${keyOk ? '••••••• (guardada)' : 'No configurada'}</b></div>
+        <div style="margin-top:4px;font-size:.6rem;color:${numOk&&keyOk?'#66bb6a':'#e17055'};">
+            ${numOk && keyOk ? '🟢 Listo para activar alertas automáticas' : '⚠️ Completa la configuración antes de activar'}
+        </div>`;
+}
+
+// ── Guardar config ────────────────────────────────
+function guardarConfigCallMeBot() {
+    const num    = document.getElementById('wa-numero').value.trim();
+    const apikey = document.getElementById('cmb-apikey').value.trim();
+    if (!num || !apikey) {
+        setAutoStatus('⚠️ Ingresa el número y la API Key.'); return;
+    }
+    localStorage.setItem('simt_wa_numero', num);
+    localStorage.setItem('simt_cmb_apikey', apikey);
+    const el = document.getElementById('cmb-guardado');
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2500);
+}
+
+function cargarNumeroGuardado() {
+    const num    = localStorage.getItem('simt_wa_numero');
+    const apikey = localStorage.getItem('simt_cmb_apikey');
+    if (num)    document.getElementById('wa-numero').value = num;
+    if (apikey) document.getElementById('cmb-apikey').value = apikey;
+}
+
+// ── Enviar vía CallMeBot ──────────────────────────
+async function enviarCallMeBot(mensaje) {
+    const num    = (localStorage.getItem('simt_wa_numero') || '').replace(/\s+/g,'').replace(/^\+/,'');
+    const apikey = (localStorage.getItem('simt_cmb_apikey') || '').trim();
+
+    if (!num || !apikey) {
+        setAutoStatus('⚠️ Configura el número y API Key en la pestaña Config.');
+        return { ok: false, error: 'Sin credenciales' };
+    }
+
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${num}&text=${encodeURIComponent(mensaje)}&apikey=${apikey}`;
+
+    try {
+        // CallMeBot requiere modo no-cors desde el navegador
+        const resp = await fetch(url, { mode:'no-cors' });
+        // no-cors siempre retorna opaque — consideramos enviado si no lanza error
+        return { ok: true };
+    } catch(err) {
+        return { ok: false, error: err.message };
+    }
+}
+
+// ── Prueba de envío ───────────────────────────────
+async function probarCallMeBot() {
+    const btn = document.getElementById('btn-cmb-test');
+    btn.textContent = '⏳ Enviando...';
+    btn.disabled = true;
+
+    const ts  = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const msg = `✅ *SIMT Bolivia — Prueba de conexión*\n📅 ${ts}\n🔥 Sistema de alertas funcionando correctamente.\n🌐 Camaradas de la Naturaleza`;
+
+    const result = await enviarCallMeBot(msg);
+
+    btn.textContent  = result.ok ? '✅ ¡Mensaje enviado!' : '❌ Error al enviar';
+    btn.style.background = result.ok ? 'rgba(37,211,102,.35)' : 'rgba(214,48,49,.2)';
+    btn.style.color  = result.ok ? '#25d366' : '#ff6b6b';
+    btn.style.border = result.ok ? '1px solid #25d366' : '1px solid #c62828';
+
+    if (!result.ok) {
+        setAutoStatus(`❌ Error: ${result.error}\nVerifica tu número y API Key.`);
+    } else {
+        setAutoStatus('✅ Mensaje de prueba enviado. Revisa tu WhatsApp (puede tardar ~30 seg).');
+    }
+
+    setTimeout(() => {
+        btn.textContent = '📨 Enviar mensaje de prueba';
+        btn.style.background = 'rgba(37,211,102,.15)';
+        btn.style.color = '#25d366';
+        btn.style.border = '1px solid #25d366';
+        btn.disabled = false;
+    }, 4000);
+}
+
+// ── Abrir chat con bot CallMeBot ──────────────────
+function abrirWhatsAppCallMeBot() {
+    window.open('https://wa.me/34644652191?text=I%20allow%20callmebot%20to%20send%20me%20messages', '_blank');
+}
+
+// ── Toggle CallMeBot automático ───────────────────
+function toggleCallMeBot() {
+    const num    = localStorage.getItem('simt_wa_numero') || '';
+    const apikey = localStorage.getItem('simt_cmb_apikey') || '';
+
+    if (!autoAlertCMBActivo && (!num || !apikey)) {
+        setAutoStatus('⚠️ Primero guarda el número y la API Key en la pestaña Config.');
+        showTab('tab-config');
+        return;
+    }
+
+    autoAlertCMBActivo = !autoAlertCMBActivo;
+    const btn = document.getElementById('btn-auto-cmb');
+
+    if (autoAlertCMBActivo) {
+        btn.textContent = '📵 Desactivar CallMeBot automático';
+        btn.style.background = 'rgba(37,211,102,.35)';
+        arrancarIntervalAlertas();
+        const mins = document.getElementById('umbral-intervalo').value;
+        setAutoStatus(`✅ CallMeBot activo\n📱 Número: ${num}\n⏱️ Verificando cada ${mins} min\n📊 Umbral: ≥${document.getElementById('umbral-total').value} focos o ≥${document.getElementById('umbral-alta').value} alta intensidad`);
+    } else {
+        btn.textContent = '📲 Activar CallMeBot automático';
+        btn.style.background = 'rgba(37,211,102,.15)';
+        detenerIntervalAlertas();
+        setAutoStatus('');
+    }
+    actualizarBadgeAuto();
+}
+
+// ── Notificaciones del navegador ──────────────────
+async function activarNotificacionesBrowser() {
+    const btn = document.getElementById('btn-notif-browser');
+    if (!('Notification' in window)) {
+        setAutoStatus('⚠️ Tu navegador no soporta notificaciones.'); return;
+    }
+    if (Notification.permission === 'granted') {
+        autoAlertBrowserActivo = !autoAlertBrowserActivo;
+        btn.textContent  = autoAlertBrowserActivo ? '🔕 Desactivar notificaciones' : '🔔 Notificaciones del navegador';
+        btn.style.background = autoAlertBrowserActivo ? 'rgba(9,132,227,.4)' : 'rgba(9,132,227,.2)';
+        if (autoAlertBrowserActivo) {
+            new Notification('SIMT Bolivia 🔥', {
+                body:'Notificaciones de focos de calor activadas.',
+                icon:'https://raw.githubusercontent.com/camaradasn/simit/main/logo-simt.png.png'
+            });
+        }
+        actualizarBadgeAuto(); return;
+    }
+    if (Notification.permission === 'denied') {
+        setAutoStatus('🚫 Permiso denegado. Habilítalas en ajustes del navegador.'); return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+        autoAlertBrowserActivo = true;
+        btn.textContent = '🔕 Desactivar notificaciones';
+        btn.style.background = 'rgba(9,132,227,.4)';
+        new Notification('SIMT Bolivia 🔥', {
+            body:'Notificaciones de focos de calor activadas.',
+            icon:'https://raw.githubusercontent.com/camaradasn/simit/main/logo-simt.png.png'
+        });
+    } else {
+        setAutoStatus('⚠️ Permiso no otorgado.');
+    }
+    actualizarBadgeAuto();
+}
+
+// ── Intervalo ─────────────────────────────────────
+function arrancarIntervalAlertas() {
+    detenerIntervalAlertas();
+    const mins = parseInt(document.getElementById('umbral-intervalo').value) || 30;
+    autoAlertIntervalId = setInterval(verificarAlertasAutomaticas, mins * 60 * 1000);
+}
+
+function detenerIntervalAlertas() {
+    if (autoAlertIntervalId) { clearInterval(autoAlertIntervalId); autoAlertIntervalId = null; }
+}
+
+function actualizarBadgeAuto() {
+    const badge  = document.getElementById('auto-alert-badge');
+    const activo = autoAlertCMBActivo || autoAlertBrowserActivo;
+    badge.textContent        = activo ? 'ON' : 'OFF';
+    badge.style.background   = activo ? 'rgba(37,211,102,.2)'  : 'rgba(255,255,255,.08)';
+    badge.style.color        = activo ? '#25d366' : 'var(--dim)';
+}
+
+function setAutoStatus(txt) {
+    const el = document.getElementById('auto-alert-status');
+    if (el) el.innerHTML = txt.replace(/\n/g,'<br>');
+}
+
+// ── Verificación periódica ────────────────────────
+async function verificarAlertasAutomaticas() {
+    if (!focosData.length) return;
+
+    const ahora       = Date.now();
+    const intervaloMs = (parseInt(document.getElementById('umbral-intervalo')?.value) || 30) * 60 * 1000;
+    if (ahora - ultimaAlertaTs < intervaloMs) return;
+
+    const umbralTotal = parseInt(document.getElementById('umbral-total')?.value) || 30;
+    const umbralAlta  = parseInt(document.getElementById('umbral-alta')?.value)  || 5;
+    const umbral6h    = parseInt(document.getElementById('umbral-6h')?.value)    || 10;
+
+    const total  = focosData.length;
+    const alta   = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const ult6h  = focosData.filter(f => (f.edadH??99) <= 6).length;
+
+    const superaUmbral = total >= umbralTotal || alta >= umbralAlta || ult6h >= umbral6h;
+    if (!superaUmbral) return;
+
+    // Anti-spam: no alertar si los focos no cambiaron significativamente
+    if (Math.abs(total - ultimoEstadoFocos) < 3 && ahora - ultimaAlertaTs < intervaloMs * 2) return;
+
+    ultimaAlertaTs    = ahora;
+    ultimoEstadoFocos = total;
+
+    let nivel = '🟡 MODERADO';
+    if (alta > 10 || total > 80) nivel = '🔴 CRÍTICO';
+    else if (alta > 5 || total > 30) nivel = '🟠 ALTO';
+
+    const ts    = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const media = focosData.filter(f => getIntensidad(f.brightness)==='media').length;
+    const baja  = focosData.filter(f => getIntensidad(f.brightness)==='baja').length;
+
+    const msg = `🔥 *ALERTA AUTOMÁTICA SIMT*
+📅 ${ts} (Bolivia)
+⚠️ Nivel: *${nivel}*
+
+📊 *Focos detectados Bolivia:*
+• Total: *${total}*   Últimas 6h: *${ult6h}* 🔴
+• Alta: *${alta}* 🔴  Media: *${media}* 🟡  Baja: *${baja}* 🟢
+
+📡 NASA FIRMS VIIRS · Ventana ${focosVentana}h
+🌐 SIMT — Camaradas de la Naturaleza`;
+
+    // 1. Notificación del navegador
+    if (autoAlertBrowserActivo && Notification.permission === 'granted') {
+        const notif = new Notification(`🔥 SIMT Bolivia — ${nivel}`, {
+            body: `${total} focos · ${ult6h} en últimas 6h · Alta intensidad: ${alta}`,
+            icon: 'https://raw.githubusercontent.com/camaradasn/simit/main/logo-simt.png.png',
+            tag: 'simt-alerta',
+            requireInteraction: true,
+        });
+        notif.onclick = () => { window.focus(); notif.close(); };
+    }
+
+    // 2. CallMeBot
+    if (autoAlertCMBActivo) {
+        const result = await enviarCallMeBot(msg);
+        const mins = document.getElementById('umbral-intervalo')?.value || 30;
+        if (result.ok) {
+            setAutoStatus(`✅ Alerta enviada vía CallMeBot: ${ts}\n⏱️ Próxima verificación en ${mins} min`);
+        } else {
+            setAutoStatus(`⚠️ Error al enviar CallMeBot: ${result.error}\nSe reintentará en ${mins} min`);
+        }
+    }
+}
+
+
+function updateClock() {
+    const now = new Date();
+    const opts = { timeZone:'America/La_Paz' };
+    const timeStr = now.toLocaleTimeString('es-BO', { ...opts, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    const dateStr = now.toLocaleDateString('es-BO', { ...opts, weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+    const clockTime = document.getElementById('clock-time');
+    const clockDate = document.getElementById('clock-date');
+    const clockLegacy = document.getElementById('clock');
+    if (clockTime) clockTime.textContent = timeStr;
+    if (clockDate) clockDate.textContent = dateStr.toUpperCase();
+    if (clockLegacy) clockLegacy.textContent = timeStr + ' · ' + dateStr;
+    // Verificar alertas automáticas cada minuto
+    if (now.getSeconds() === 0) verificarAlertasAutomaticas();
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -1742,6 +2159,7 @@ async function refreshFocos() {
 // INIT
 // ═══════════════════════════════════════════════════
 async function init() {
+    cargarNumeroGuardado();
     await fetchClima('Santa Cruz de la Sierra', null);
     await fetchFocosNASA();
     // Focos cada 6 horas (NASA FIRMS actualiza ~4 veces/día)
@@ -1755,13 +2173,160 @@ async function init() {
 // REPORTE — GENERACIÓN Y DESCARGA
 // ═══════════════════════════════════════════════════
 
+let reporteMapInst = null;
+let reporteMapFocosLG = null;
+
 function abrirReporte() {
+    // Poblar selector de KML
+    const sel = document.getElementById('rpt-kml-filtro');
+    sel.innerHTML = '<option value="">🇧🇴 Bolivia completa</option>';
+    Object.entries(kmlStore).forEach(([id, k]) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${tipoLabel(k.tipo)} ${k.name}`;
+        sel.appendChild(opt);
+    });
+
     poblarReporte();
     document.getElementById('reporte-overlay').style.display = 'block';
+
+    // Iniciar mapa del reporte con un pequeño delay para que el DOM esté visible
+    setTimeout(iniciarMapaReporte, 200);
+}
+
+function iniciarMapaReporte() {
+    const container = document.getElementById('rpt-mapa');
+    if (!container) return;
+
+    if (reporteMapInst) {
+        reporteMapInst.remove();
+        reporteMapInst = null;
+    }
+
+    reporteMapInst = L.map('rpt-mapa', { zoomControl:true, attributionControl:false });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(reporteMapInst);
+
+    reporteMapFocosLG = L.layerGroup().addTo(reporteMapInst);
+    renderFocosEnMapaReporte();
+
+    const loading = document.getElementById('rpt-mapa-loading');
+    if (loading) loading.style.display = 'none';
+}
+
+function renderFocosEnMapaReporte() {
+    if (!reporteMapInst || !reporteMapFocosLG) return;
+    reporteMapFocosLG.clearLayers();
+
+    const sel    = document.getElementById('rpt-kml-filtro');
+    const kmlId  = sel ? sel.value : '';
+    let datos = getFocosParaReporte(kmlId);
+
+    datos.forEach(f => {
+        const cfg = getColorPorEdad(f.edadH ?? 0);
+        L.circleMarker([f.lat, f.lng], {
+            radius: Math.max(3, cfg.r - 2),
+            color: cfg.color, fillColor: cfg.fill,
+            fillOpacity: 0.85, weight: 1,
+        }).addTo(reporteMapFocosLG);
+    });
+
+    // Dibujar KML seleccionado si hay
+    if (kmlId && kmlStore[kmlId]) {
+        try {
+            const bounds = kmlStore[kmlId].layer.getBounds();
+            if (bounds && bounds.isValid()) {
+                reporteMapInst.fitBounds(bounds.pad(0.1));
+            }
+        } catch(e) { reporteMapInst.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]); }
+        // Re-añadir capa KML semitransparente
+        const k = kmlStore[kmlId];
+        try {
+            const kmlClone = L.geoJSON(kmlStore[kmlId].layer.toGeoJSON(), {
+                style: { color: k.color, fillColor: k.color, fillOpacity: 0.15, weight: 2 }
+            }).addTo(reporteMapInst);
+        } catch(e) {}
+    } else {
+        reporteMapInst.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]);
+    }
+
+    const nota = document.getElementById('rpt-mapa-nota');
+    if (nota) nota.textContent = `${datos.length} focos mostrados · Ventana: ${focosVentana}h · Base: ESRI World Imagery`;
 }
 
 function cerrarReporte() {
     document.getElementById('reporte-overlay').style.display = 'none';
+    if (reporteMapInst) {
+        reporteMapInst.remove();
+        reporteMapInst = null;
+    }
+    document.getElementById('rpt-mapa-loading').style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════════
+// HELPER: focos filtrados por KML seleccionado
+// ═══════════════════════════════════════════════════
+function getFocosParaReporte(kmlId) {
+    if (!kmlId || !kmlStore[kmlId]) return focosData;
+    const k = kmlStore[kmlId];
+    try {
+        const bounds = k.layer.getBounds();
+        if (!bounds || !bounds.isValid()) return focosData;
+        return focosData.filter(f =>
+            f.lat >= bounds.getSouth() && f.lat <= bounds.getNorth() &&
+            f.lng >= bounds.getWest()  && f.lng <= bounds.getEast()
+        );
+    } catch(e) { return focosData; }
+}
+
+// ═══════════════════════════════════════════════════
+// WHATSAPP ALERT
+// ═══════════════════════════════════════════════════
+async function enviarAlertaWhatsApp() {
+    const sel     = document.getElementById('rpt-kml-filtro');
+    const kmlId   = sel ? sel.value : '';
+    const kmlNom  = kmlId && kmlStore[kmlId] ? kmlStore[kmlId].name : 'Bolivia';
+    const datos   = getFocosParaReporte(kmlId);
+    const alta    = datos.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const media   = datos.filter(f => getIntensidad(f.brightness)==='media').length;
+    const baja    = datos.filter(f => getIntensidad(f.brightness)==='baja').length;
+    const ult6h   = datos.filter(f => (f.edadH??99) <= 6).length;
+    const ahora   = new Date().toLocaleString('es-BO',{timeZone:'America/La_Paz',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+    let nivel = '🟡 MODERADO';
+    if (alta > 10 || datos.length > 80) nivel = '🔴 CRÍTICO';
+    else if (alta > 5 || datos.length > 30) nivel = '🟠 ALTO';
+
+    const msg = `🔥 *ALERTA SIMT — Camaradas de la Naturaleza*
+📅 ${ahora} (hora Bolivia)
+📍 Área: *${kmlNom}* · Ventana: ${focosVentana}h
+
+⚠️ Nivel: *${nivel}*
+
+📊 *Focos detectados:*
+• Total: *${datos.length}*   Últimas 6h: *${ult6h}*
+• Alta intensidad: *${alta}* 🔴
+• Media intensidad: *${media}* 🟡
+• Baja intensidad: *${baja}* 🟢
+
+📡 Fuente: NASA FIRMS VIIRS NOAA-20
+🌐 Sistema Integral de Monitoreo de Incendios y Territorio (SIMT)`;
+
+    const apikey = localStorage.getItem('simt_cmb_apikey') || '';
+    const num    = localStorage.getItem('simt_wa_numero') || '';
+
+    if (apikey && num) {
+        // Enviar silenciosamente vía CallMeBot
+        const btn = document.querySelector('[onclick="enviarAlertaWhatsApp()"]');
+        if (btn) { btn.textContent = '⏳ Enviando...'; btn.disabled = true; }
+        const result = await enviarCallMeBot(msg);
+        if (btn) {
+            btn.textContent = result.ok ? '✅ Enviado!' : '❌ Error';
+            setTimeout(() => { btn.textContent = '📲 Enviar Alerta WA'; btn.disabled = false; }, 3000);
+        }
+    } else {
+        // Fallback: abrir WhatsApp web con mensaje pre-cargado
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
 }
 
 function poblarReporte() {
@@ -1772,18 +2337,28 @@ function poblarReporte() {
     document.getElementById('rpt-fecha-gen').textContent = 'Generado: ' + ahora;
     document.getElementById('rpt-hora-pie').textContent = ahora;
 
+    // ── Filtro KML ──
+    const sel    = document.getElementById('rpt-kml-filtro');
+    const kmlId  = sel ? sel.value : '';
+    const datos  = getFocosParaReporte(kmlId);
+    const areaLabel = kmlId && kmlStore[kmlId] ? kmlStore[kmlId].name : 'Bolivia';
+
+    // Actualizar subtítulo del reporte
+    const subtitulo = document.getElementById('rpt-area-label');
+    if (subtitulo) subtitulo.textContent = `Área: ${areaLabel} · Ventana: ${focosVentana}h`;
+
     // ── Focos ──
-    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta');
-    const media = focosData.filter(f => getIntensidad(f.brightness)==='media');
-    const baja  = focosData.filter(f => getIntensidad(f.brightness)==='baja');
+    const alta  = datos.filter(f => getIntensidad(f.brightness)==='alta');
+    const media = datos.filter(f => getIntensidad(f.brightness)==='media');
+    const baja  = datos.filter(f => getIntensidad(f.brightness)==='baja');
     document.getElementById('rpt-alta').textContent  = alta.length;
     document.getElementById('rpt-media').textContent = media.length;
     document.getElementById('rpt-baja').textContent  = baja.length;
-    document.getElementById('rpt-total').textContent = focosData.length;
+    document.getElementById('rpt-total').textContent = datos.length;
 
     // FRP stats
-    if (focosData.length) {
-        const frps = focosData.map(f=>f.frp).filter(v=>!isNaN(v)&&v>0);
+    if (datos.length) {
+        const frps = datos.map(f=>f.frp).filter(v=>!isNaN(v)&&v>0);
         const frpAvg = frps.length ? (frps.reduce((a,b)=>a+b,0)/frps.length).toFixed(1) : '—';
         const frpMax = frps.length ? Math.max(...frps).toFixed(1) : '—';
         document.getElementById('rpt-frp').innerHTML =
@@ -1792,7 +2367,7 @@ function poblarReporte() {
 
         // Satélites
         const satCount = {};
-        focosData.forEach(f => { satCount[f.satellite] = (satCount[f.satellite]||0)+1; });
+        datos.forEach(f => { satCount[f.satellite] = (satCount[f.satellite]||0)+1; });
         document.getElementById('rpt-sats').innerHTML = Object.entries(satCount)
             .map(([s,n]) => `<span style="color:#fff;">🛰️ ${s}: <b>${n}</b></span>`)
             .join('<br>');
@@ -1804,7 +2379,7 @@ function poblarReporte() {
     // Departamentos
     const counts = {};
     CFG.DEPTS.forEach(d => counts[d]=0);
-    focosData.forEach(f => { const d=getDept(f); if(counts[d]!==undefined) counts[d]++; });
+    datos.forEach(f => { const d=getDept(f); if(counts[d]!==undefined) counts[d]++; });
     const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).filter(([,v])=>v>0);
     const maxVal = sorted[0]?.[1] || 1;
     const COLS = ['#ff4500','#ff6b35','#ffa500','#f9ca24','#66bb6a','#0984e3','#6c5ce7','#fd79a8','#b2bec3'];
@@ -1818,6 +2393,9 @@ function poblarReporte() {
                 <span style="min-width:22px;text-align:right;font-weight:700;color:${COLS[i]};">${count}</span>
             </div>`).join('')
         : '<span style="color:#81c784;">Sin focos detectados en departamentos conocidos.</span>';
+
+    // Actualizar el mapa del reporte si ya está inicializado
+    if (reporteMapInst) renderFocosEnMapaReporte();
 
     // ── Clima actual ──
     // Tomamos la ciudad activa
@@ -1895,7 +2473,6 @@ function poblarReporte() {
         document.getElementById('rpt-kml').innerHTML = `
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
             ${kmlEntries.map(k => {
-                // Contar focos dentro del bounding box de la capa
                 let focosEnCapa = 0;
                 try {
                     const bounds = k.layer.getBounds();
@@ -1906,8 +2483,9 @@ function poblarReporte() {
                         ).length;
                     }
                 } catch(e) {}
+                const isSelected = kmlId && kmlStore[kmlId] && kmlStore[kmlId] === k;
                 return `
-                <div style="background:#123b2a;border-radius:6px;padding:10px 12px;border-left:3px solid ${k.color};">
+                <div style="background:#123b2a;border-radius:6px;padding:10px 12px;border-left:3px solid ${k.color};${isSelected?'box-shadow:0 0 0 2px '+k.color+';':''}">
                     <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
                         <div style="width:8px;height:8px;border-radius:2px;background:${k.color};flex-shrink:0;"></div>
                         <span style="font-weight:600;color:#fff;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${k.name}</span>
@@ -2015,3 +2593,4 @@ init();
 </script>
 </body>
 </html>
+
