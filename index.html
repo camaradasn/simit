@@ -502,15 +502,25 @@
                 <button class="mbtn" onclick="exportCSV()">💾 CSV</button>
                 <button class="mbtn" onclick="abrirReporte()" style="background:rgba(9,132,227,.25);border-color:#0984e3;color:#74b9ff;">📄 Reporte</button>
             </div>
+            <!-- Ventana temporal -->
+            <div class="btn-group">
+                <span style="font-size:.62rem;color:var(--dim);padding:5px 4px 5px 6px;">⏱️</span>
+                <button class="mbtn btn-ventana active" id="btn-v24" onclick="setVentana(24,this)">24 h</button>
+                <button class="mbtn btn-ventana"        id="btn-v48" onclick="setVentana(48,this)">48 h</button>
+                <span style="font-size:.6rem;color:var(--dim);padding:5px 6px 5px 2px;" id="focos-prox"></span>
+            </div>
         </div>
 
         <div id="map"></div>
 
         <div class="map-legend">
-            <div class="legend-title">🔥 Focos de Calor</div>
-            <div class="leg-row"><div class="leg-dot" style="background:#ff4500;border-color:#ff0000;"></div><span>Alta intensidad (&gt;400K)</span></div>
-            <div class="leg-row"><div class="leg-dot" style="background:#ffa500;border-color:#ff8c00;"></div><span>Media (300–400K)</span></div>
-            <div class="leg-row"><div class="leg-dot" style="background:#ffd700;border-color:#e6c000;"></div><span>Baja (&lt;300K)</span></div>
+            <div class="legend-title">🔥 Focos de Calor — por antigüedad</div>
+            <div id="legend-focos-rows">
+                <div class="leg-row"><div class="leg-dot" style="background:#ff2200;border-color:#ff0000;"></div><span>Últimas 6 h</span></div>
+                <div class="leg-row"><div class="leg-dot" style="background:#ff7700;border-color:#ff6000;"></div><span>6 – 12 h</span></div>
+                <div class="leg-row"><div class="leg-dot" style="background:#ffb800;border-color:#ffa500;"></div><span>12 – 24 h</span></div>
+                <div class="leg-row"><div class="leg-dot" style="background:#e8e800;border-color:#cccc00;"></div><span>24 – 48 h</span></div>
+            </div>
             <div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px;">
                 <div class="legend-title">📂 Capas KML</div>
                 <div id="kml-legend-items" style="font-size:.62rem;color:var(--dim);">Sin capas cargadas</div>
@@ -860,12 +870,15 @@ function toggleKMLGroup(tipo, btn) {
 }
 
 // ═══════════════════════════════════════════════════
-// NASA FIRMS — FOCOS REALES
+// NASA FIRMS — FOCOS REALES (ventana 24h / 48h)
 // ═══════════════════════════════════════════════════
+let focosVentana = 24;   // horas activas: 24 o 48
+let focosDataRaw = [];   // todos los focos crudos (48h)
+
 async function fetchFocosNASA() {
     const { west, south, east, north } = CFG.BBOX;
-    // Fuente VIIRS NOAA-20 NRT (más actualizada)
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/1`;
+    // Pedimos 2 días para tener tanto 24h como 48h disponibles sin volver a pedir
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/2`;
 
     setAPIStatus('nasa', 'warn', 'Conectando...');
     try {
@@ -874,29 +887,73 @@ async function fetchFocosNASA() {
         const text = await resp.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
 
-        focosData = parsed.data
-            .map(r => ({
-                lat:        parseFloat(r.latitude),
-                lng:        parseFloat(r.longitude),
-                brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
-                frp:        parseFloat(r.frp || 0),
-                fecha:      r.acq_date  || '—',
-                hora:       r.acq_time  || '—',
-                satellite:  r.satellite || 'VIIRS',
-                confidence: r.confidence|| 'n',
-            }))
+        const ahora = Date.now();
+        focosDataRaw = parsed.data
+            .map(r => {
+                const fecha  = r.acq_date || '';
+                const horaRaw= String(r.acq_time || '0').padStart(4,'0');
+                const hh     = horaRaw.slice(0,2);
+                const mm     = horaRaw.slice(2,4);
+                const dt     = fecha ? new Date(`${fecha}T${hh}:${mm}:00Z`).getTime() : NaN;
+                return {
+                    lat:        parseFloat(r.latitude),
+                    lng:        parseFloat(r.longitude),
+                    brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
+                    frp:        parseFloat(r.frp || 0),
+                    fecha,
+                    hora:       `${hh}:${mm}`,
+                    satellite:  r.satellite || 'VIIRS',
+                    confidence: r.confidence || 'n',
+                    ts:         dt,
+                    edadH:      isNaN(dt) ? 0 : (ahora - dt) / 3600000,
+                };
+            })
             .filter(f => !isNaN(f.lat) && !isNaN(f.lng));
 
-        setAPIStatus('nasa', 'ok', `${focosData.length} focos ✓`);
-        renderFocos();
-        updateCounters();
-        renderDepts();
-        renderAlertas();
+        setAPIStatus('nasa', 'ok', `${focosDataRaw.length} focos (48h) ✓`);
+        aplicarVentana();
+        actualizarUltimaActualizacion();
 
     } catch (err) {
         console.warn('NASA FIRMS error:', err.message);
         setAPIStatus('nasa', 'err', 'Error — usando demo');
         useDemoFocos();
+    }
+}
+
+function aplicarVentana() {
+    focosData = focosDataRaw.filter(f => f.edadH <= focosVentana);
+    renderFocos();
+    updateCounters();
+    renderDepts();
+    renderAlertas();
+    actualizarBotonesVentana();
+}
+
+function setVentana(horas, btn) {
+    focosVentana = horas;
+    document.querySelectorAll('.btn-ventana').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    aplicarVentana();
+}
+
+function actualizarBotonesVentana() {
+    const t24 = focosDataRaw.filter(f => f.edadH <= 24).length;
+    const t48 = focosDataRaw.filter(f => f.edadH <= 48).length;
+    const b24 = document.getElementById('btn-v24');
+    const b48 = document.getElementById('btn-v48');
+    if (b24) b24.title = `${t24} focos en últimas 24h`;
+    if (b48) b48.title = `${t48} focos en últimas 48h`;
+}
+
+function actualizarUltimaActualizacion() {
+    const el = document.getElementById('focos-ts');
+    if (el) el.textContent = 'Act: ' + new Date().toLocaleTimeString('es-BO', {hour:'2-digit',minute:'2-digit'});
+    // Próxima actualización en 6h
+    const prox = document.getElementById('focos-prox');
+    if (prox) {
+        const next = new Date(Date.now() + 6*3600000);
+        prox.textContent = 'Próx: ' + next.toLocaleTimeString('es-BO', {hour:'2-digit',minute:'2-digit'});
     }
 }
 
@@ -915,109 +972,152 @@ function useDemoFocos() {
         { latC:-21.0, lngC:-63.8, r:1,   p:.03, dept:'Tarija'     },
     ];
 
-    focosData = [];
-    for (let i = 0; i < 150; i++) {
+    focosDataRaw = [];
+    const ahora = Date.now();
+    for (let i = 0; i < 220; i++) {
         let acc=0, zona=zonas[0];
         const rand=Math.random();
         for (const z of zonas) { acc+=z.p; if(rand<acc){zona=z;break;} }
         const angle=Math.random()*2*Math.PI, dist=Math.random()*zona.r;
-        focosData.push({
+        // edadH distribuida entre 0 y 48h
+        const edadH = Math.random() * 48;
+        const ts    = ahora - edadH * 3600000;
+        const d     = new Date(ts);
+        const hh    = String(d.getUTCHours()).padStart(2,'0');
+        const mm    = String(d.getUTCMinutes()).padStart(2,'0');
+        focosDataRaw.push({
             lat:        zona.latC + dist*Math.sin(angle),
             lng:        zona.lngC + dist*Math.cos(angle),
             brightness: 260 + Math.random()*230,
             frp:        Math.random()*200,
-            fecha:      new Date().toISOString().slice(0,10),
-            hora:       String(Math.floor(Math.random()*24)).padStart(2,'0')+'00',
+            fecha:      d.toISOString().slice(0,10),
+            hora:       `${hh}:${mm}`,
             satellite:  ['VIIRS','MODIS','GOES-16'][Math.floor(Math.random()*3)],
             confidence: ['l','n','h'][Math.floor(Math.random()*3)],
             dept:       zona.dept,
+            ts,
+            edadH,
         });
     }
 
     setAPIStatus('nasa', 'warn', 'Modo demo activo');
-    renderFocos();
-    updateCounters();
-    renderDepts();
-    renderAlertas();
+    aplicarVentana();
+    actualizarUltimaActualizacion();
 }
 
 // ═══════════════════════════════════════════════════
-// RENDER FOCOS EN MAPA
+// RENDER FOCOS EN MAPA — color por antigüedad
 // ═══════════════════════════════════════════════════
-function getIntensidad(b) {
-    return b >= 380 ? 'alta' : b >= 310 ? 'media' : 'baja';
+function getColorPorEdad(edadH) {
+    // 0-6h → rojo vivo · 6-24h → naranja · 24-48h → amarillo
+    if (edadH <= 6)  return { color:'#ff0000', fill:'#ff2200', r:9,  label:'< 6 h'   };
+    if (edadH <= 12) return { color:'#ff6000', fill:'#ff7700', r:8,  label:'6 – 12 h' };
+    if (edadH <= 24) return { color:'#ffa500', fill:'#ffb800', r:7,  label:'12 – 24 h'};
+    return                   { color:'#cccc00', fill:'#e8e800', r:5,  label:'24 – 48 h'};
 }
-
-const FOCO_CFG = {
-    alta:  { color:'#ff0000', fill:'#ff4500', r:10 },
-    media: { color:'#ff8c00', fill:'#ffa500', r: 7 },
-    baja:  { color:'#e6c000', fill:'#ffd700', r: 5 },
-};
 
 function renderFocos() {
     LG.focos.clearLayers();
     const heat = [];
 
     focosData.forEach(f => {
-        const intens = getIntensidad(f.brightness);
-        const c = FOCO_CFG[intens];
+        const cfg = getColorPorEdad(f.edadH ?? 0);
 
         const circle = L.circleMarker([f.lat, f.lng], {
-            radius:      c.r,
-            color:       c.color,
-            fillColor:   c.fill,
+            radius:      cfg.r,
+            color:       cfg.color,
+            fillColor:   cfg.fill,
             fillOpacity: 0.85,
             weight:      1.5,
         });
 
-        circle.bindPopup(buildPopup(f, intens, c.fill), { maxWidth:230 });
+        circle.bindPopup(buildPopup(f, cfg), { maxWidth:240 });
         LG.focos.addLayer(circle);
 
-        heat.push([f.lat, f.lng, intens==='alta'?1:intens==='media'?.6:.3]);
+        // Peso en el heatmap: focos más recientes pesan más
+        const peso = f.edadH <= 6 ? 1 : f.edadH <= 24 ? 0.6 : 0.3;
+        heat.push([f.lat, f.lng, peso]);
     });
 
     if (LG.heat) map.removeLayer(LG.heat);
     LG.heat = L.heatLayer(heat, {
         radius:25, blur:20, maxZoom:10,
-        gradient:{ 0.2:'#ffd700', 0.5:'#ff6b35', 0.8:'#ff0000', 1:'#800000' }
+        gradient:{ 0.2:'#ffe000', 0.5:'#ff6b35', 0.8:'#ff0000', 1:'#800000' }
     }).addTo(map);
+
+    // Actualizar leyenda del mapa
+    actualizarLeyendaTemporal();
 }
 
-function buildPopup(f, intens, color) {
+function actualizarLeyendaTemporal() {
+    const el = document.getElementById('legend-focos-rows');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="leg-row"><div class="leg-dot" style="background:#ff2200;border-color:#ff0000;"></div><span>Últimas 6 h</span></div>
+        <div class="leg-row"><div class="leg-dot" style="background:#ff7700;border-color:#ff6000;"></div><span>6 – 12 h</span></div>
+        <div class="leg-row"><div class="leg-dot" style="background:#ffb800;border-color:#ffa500;"></div><span>12 – 24 h</span></div>
+        ${focosVentana===48?'<div class="leg-row"><div class="leg-dot" style="background:#e8e800;border-color:#cccc00;"></div><span>24 – 48 h</span></div>':''}`;
+}
+
+function buildPopup(f, cfg) {
     const conf = { l:'Baja', n:'Nominal', h:'Alta' }[f.confidence] || '—';
+    const edadStr = f.edadH != null ? (f.edadH < 1 ? '< 1 h' : `${f.edadH.toFixed(1)} h`) : '—';
     return `
-    <div style="font-size:.78rem;min-width:190px;">
-        <div style="color:${color};font-weight:700;font-size:.88rem;margin-bottom:8px;">🔥 Foco de Calor — ${intens.toUpperCase()}</div>
+    <div style="font-size:.78rem;min-width:200px;">
+        <div style="color:${cfg.fill};font-weight:700;font-size:.88rem;margin-bottom:8px;">🔥 Foco de Calor — ${cfg.label}</div>
         <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="color:var(--dim);padding:2px 0;">🌡️ Brillo</td><td style="color:${color};font-weight:600;">${f.brightness.toFixed(0)} K</td></tr>
+            <tr><td style="color:var(--dim);padding:2px 0;">⏱️ Antigüedad</td><td style="color:${cfg.fill};font-weight:600;">${edadStr}</td></tr>
+            <tr><td style="color:var(--dim);">🌡️ Brillo</td><td>${f.brightness.toFixed(0)} K</td></tr>
             <tr><td style="color:var(--dim);">⚡ FRP</td><td>${f.frp.toFixed(1)} MW</td></tr>
             <tr><td style="color:var(--dim);">🛰️ Satélite</td><td>${f.satellite}</td></tr>
             <tr><td style="color:var(--dim);">📍 Coords</td><td>${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}</td></tr>
-            <tr><td style="color:var(--dim);">📅 Fecha</td><td>${f.fecha} ${f.hora}h</td></tr>
+            <tr><td style="color:var(--dim);">📅 Detección</td><td>${f.fecha} ${f.hora} UTC</td></tr>
             <tr><td style="color:var(--dim);">🎯 Confianza</td><td>${conf}</td></tr>
         </table>
     </div>`;
 }
 
 // ═══════════════════════════════════════════════════
-// CONTADORES
+// CONTADORES — por ventana temporal
 // ═══════════════════════════════════════════════════
 function updateCounters() {
-    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
-    const media = focosData.filter(f => getIntensidad(f.brightness)==='media').length;
-    const baja  = focosData.filter(f => getIntensidad(f.brightness)==='baja').length;
-    const total = focosData.length;
+    const ult6h  = focosData.filter(f => (f.edadH ?? 0) <= 6).length;
+    const ult24h = focosDataRaw.filter(f => f.edadH <= 24).length;
+    const ult48h = focosDataRaw.filter(f => f.edadH <= 48).length;
+    const total  = focosData.length;
 
-    ['alta','media','baja'].forEach(k => {
-        const v = k==='alta'?alta:k==='media'?media:baja;
-        document.getElementById('f-'+k).textContent = v;
-        document.getElementById('h-'+k).textContent = v;
-    });
-    document.getElementById('f-total').textContent = total;
-    document.getElementById('h-total').textContent = total;
-    document.getElementById('focos-ts').textContent = 'Act: ' + new Date().toLocaleTimeString('es-BO');
+    // Panel derecho — cajas de focos
+    const fAltaEl  = document.getElementById('f-alta');
+    const fMediaEl = document.getElementById('f-media');
+    const fBajaEl  = document.getElementById('f-baja');
+    if (fAltaEl)  fAltaEl.textContent  = ult6h;
+    if (fMediaEl) fMediaEl.textContent = ult24h;
+    if (fBajaEl)  fBajaEl.textContent  = ult48h;
 
-    buildFocosChart(alta, media, baja);
+    // Labels de las cajas (las actualizamos una vez)
+    const fAltaLbl  = document.querySelector('.foco-box.alta  .foco-lbl');
+    const fMediaLbl = document.querySelector('.foco-box.media .foco-lbl');
+    const fBajaLbl  = document.querySelector('.foco-box.baja  .foco-lbl');
+    if (fAltaLbl)  fAltaLbl.innerHTML  = 'Últimas<br>6 horas';
+    if (fMediaLbl) fMediaLbl.innerHTML = 'Últimas<br>24 horas';
+    if (fBajaLbl)  fBajaLbl.innerHTML  = 'Últimas<br>48 horas';
+
+    const fTotal = document.getElementById('f-total');
+    if (fTotal) fTotal.textContent = total;
+
+    // Panel izquierdo (si existe h-alta etc.)
+    const hAltaEl  = document.getElementById('h-alta');
+    const hMediaEl = document.getElementById('h-media');
+    const hBajaEl  = document.getElementById('h-baja');
+    const hTotalEl = document.getElementById('h-total');
+    if (hAltaEl)  hAltaEl.textContent  = ult6h;
+    if (hMediaEl) hMediaEl.textContent = ult24h;
+    if (hBajaEl)  hBajaEl.textContent  = ult48h;
+    if (hTotalEl) hTotalEl.textContent = total;
+
+    document.getElementById('focos-ts').textContent = 'Act: ' + new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+
+    buildFocosChart();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1056,19 +1156,21 @@ function renderDepts() {
 // ═══════════════════════════════════════════════════
 function renderAlertas() {
     const alertas = [];
-    const alta = focosData.filter(f => getIntensidad(f.brightness)==='alta');
-    const chiq  = focosData.filter(f => f.lat<-14 && f.lat>-20 && f.lng>-65 && f.lng<-58);
-    const beni  = focosData.filter(f => f.lat>-16 && f.lat<-10 && f.lng>-68 && f.lng<-62);
+    const recientes = focosData.filter(f => (f.edadH ?? 99) <= 6);
+    const chiq      = focosData.filter(f => f.lat<-14 && f.lat>-20 && f.lng>-65 && f.lng<-58);
+    const beni      = focosData.filter(f => f.lat>-16 && f.lat<-10 && f.lng>-68 && f.lng<-62);
+    const muyRecientes = focosData.filter(f => (f.edadH ?? 99) <= 3);
 
-    if (alta.length > 15) alertas.push({ nivel:'rojo',    txt:`🔴 ${alta.length} focos de ALTA intensidad detectados en Bolivia`, hora:'Ahora'      });
-    if (chiq.length > 10) alertas.push({ nivel:'rojo',    txt:`⚠️ Concentración crítica en Chiquitanía: ${chiq.length} focos`,   hora:'Ahora'      });
-    if (beni.length >  8) alertas.push({ nivel:'naranja', txt:`🟠 Actividad elevada en Beni: ${beni.length} focos`,               hora:'Hace 5 min' });
-    if (focosData.length > 80) alertas.push({ nivel:'naranja', txt:`📊 Total superior a 80 focos activos — monitoreo intensivo`,  hora:'Hace 8 min' });
+    if (muyRecientes.length > 10) alertas.push({ nivel:'rojo',    txt:`🔴 ${muyRecientes.length} focos detectados en las últimas 3 horas`, hora:'Ahora' });
+    if (recientes.length   > 20) alertas.push({ nivel:'rojo',    txt:`⚡ ${recientes.length} focos activos en las últimas 6 h`, hora:'Ahora' });
+    if (chiq.length        > 10) alertas.push({ nivel:'rojo',    txt:`⚠️ Concentración crítica en Chiquitanía: ${chiq.length} focos`, hora:'Ahora' });
+    if (beni.length        >  8) alertas.push({ nivel:'naranja', txt:`🟠 Actividad elevada en Beni: ${beni.length} focos`, hora:'Hace 5 min' });
+    if (focosData.length   > 80) alertas.push({ nivel:'naranja', txt:`📊 Total superior a 80 focos en ventana ${focosVentana}h — monitoreo intensivo`, hora:'Ahora' });
 
     alertas.push(
-        { nivel:'naranja', txt:'🌬️ Vientos favorables a propagación en zona este',     hora:'Hace 15 min' },
-        { nivel:'amarillo',txt:'📡 VIIRS NOAA-20 pasará sobre Bolivia en ~25 min',      hora:'Hace 18 min' },
-        { nivel:'amarillo',txt:'💧 Humedad relativa baja (<35%) en Chiquitanía',        hora:'Hace 25 min' },
+        { nivel:'naranja', txt:'🌬️ Vientos favorables a propagación en zona este',  hora:'Hace 15 min' },
+        { nivel:'amarillo',txt:'📡 VIIRS NOAA-20 pasará sobre Bolivia en ~25 min',   hora:'Hace 18 min' },
+        { nivel:'amarillo',txt:'💧 Humedad relativa baja (<35%) en Chiquitanía',     hora:'Hace 25 min' },
     );
 
     document.getElementById('alertas-lista').innerHTML = alertas.map(a => `
@@ -1183,38 +1285,54 @@ function renderSoilData(data) {
 // ÍNDICES DE RIESGO (calculados con datos reales)
 // ═══════════════════════════════════════════════════
 function updateRiesgo(data) {
-    const now = new Date().getHours();
-    const h   = data.hourly;
     const c   = data.current;
+    const h   = data.hourly;
 
-    const hum  = c.relative_humidity_2m;
-    const temp = c.temperature_2m;
-    const wind = c.wind_speed_10m;
-    const sm   = h.soil_moisture_9_to_27cm?.[now] ?? 0.2;
-    const st   = h.soil_temperature_6cm?.[now]    ?? 25;
+    // Open-Meteo devuelve horas en timezone local — buscar el índice que coincide con la hora actual
+    const ahoraISO = new Date().toISOString().slice(0,13); // "2025-06-10T14"
+    let nowIdx = h.time ? h.time.findIndex(t => t.startsWith(ahoraISO)) : -1;
+    if (nowIdx < 0) nowIdx = new Date().getHours(); // fallback
 
-    // Riesgo incendio
-    const ri = Math.min(100, Math.max(0, (100-hum)*0.45 + (temp-20)*1.8 + wind*0.7 + (1-sm*10)*10));
+    const hum  = c.relative_humidity_2m ?? 60;
+    const temp = c.temperature_2m       ?? 25;
+    const wind = c.wind_speed_10m       ?? 10;
+    const sm   = h.soil_moisture_9_to_27cm?.[nowIdx] ?? 0.2;
+    const st   = h.soil_temperature_6cm?.[nowIdx]    ?? 25;
+    const pp   = h.precipitation_probability?.[nowIdx] ?? 50;
+
+    // Índice de riesgo de incendio (Canadian FWI simplificado)
+    // Factores: temperatura alta, humedad baja, viento alto, suelo seco, sin lluvia
+    const factorHum  = Math.max(0, (100 - hum) / 100);           // 0–1, seco=1
+    const factorTemp = Math.max(0, Math.min(1, (temp - 15) / 35));// 0–1, caliente=1
+    const factorViento = Math.min(1, wind / 60);                   // 0–1
+    const factorSuelo  = Math.max(0, Math.min(1, 1 - sm * 5));    // 0–1, seco=1
+    const factorLluvia = Math.max(0, (100 - pp) / 100);           // sin lluvia=1
+
+    const ri = Math.round(
+        (factorHum * 35 + factorTemp * 25 + factorViento * 15 + factorSuelo * 15 + factorLluvia * 10)
+    );
     setRiesgoBar('ri', ri, ['BAJO','MODERADO','ALTO','EXTREMO'], ['var(--green)','var(--accent2)','var(--accent)','var(--red)']);
 
-    // Humedad suelo (convertir m³/m³ → porcentaje aprox)
-    const smPct = Math.min(100, sm * 400);
+    // Humedad suelo → porcentaje (m³/m³: 0=seco, 0.4=saturado)
+    const smPct = Math.min(100, Math.round(sm * 250));
     setRiesgoBar('hs', smPct, ['MUY BAJO','BAJO','MEDIO','ALTO'], ['var(--red)','var(--accent2)','var(--accent2)','var(--green)']);
 
-    // Factor viento
-    const fv = Math.min(100, wind*2.2);
+    // Factor viento (0–80 km/h → 0–100%)
+    const fv = Math.min(100, Math.round(wind * 1.25));
     setRiesgoBar('fv', fv, ['BAJO','MODERADO','ALTO','MUY ALTO'], ['var(--green)','var(--accent2)','var(--accent)','var(--red)']);
 
-    // Temp suelo
-    const tsPct = Math.min(100, (st/50)*100);
+    // Temp suelo (0–60°C → 0–100%)
+    const tsPct = Math.min(100, Math.round((st / 60) * 100));
     setRiesgoBar('ts', tsPct, ['FRÍO','TEMPLADO','CÁLIDO','CALIENTE'], ['var(--blue)','var(--green)','var(--accent2)','var(--red)']);
 
     // Badge global
     const badge = document.getElementById('riesgo-badge');
-    if      (ri>80) { badge.textContent='EXTREMO'; badge.style.background='rgba(214,48,49,.2)';  badge.style.color='var(--red)';    }
-    else if (ri>60) { badge.textContent='ALTO';    badge.style.background='rgba(232,93,4,.15)';  badge.style.color='var(--accent)'; }
-    else if (ri>40) { badge.textContent='MODERADO';badge.style.background='rgba(244,140,6,.15)'; badge.style.color='var(--accent2)';}
-    else            { badge.textContent='BAJO';    badge.style.background='rgba(0,184,148,.15)'; badge.style.color='var(--green)';  }
+    if (badge) {
+        if      (ri > 75) { badge.textContent='EXTREMO'; badge.style.background='rgba(214,48,49,.2)';  badge.style.color='var(--red)';    }
+        else if (ri > 50) { badge.textContent='ALTO';    badge.style.background='rgba(232,93,4,.15)';  badge.style.color='var(--accent)'; }
+        else if (ri > 25) { badge.textContent='MODERADO';badge.style.background='rgba(244,140,6,.15)'; badge.style.color='var(--accent2)';}
+        else              { badge.textContent='BAJO';    badge.style.background='rgba(0,184,148,.15)'; badge.style.color='var(--green)';  }
+    }
 }
 
 function setRiesgoBar(id, pct, labels, colors) {
@@ -1285,14 +1403,21 @@ function buildTempChart(data) {
     });
 }
 
-function buildFocosChart(alta, media, baja) {
-    const now  = new Date().getHours();
-    const HORAS = Array.from({length:12},(_,i) => `${(now-11+i+24)%24}h`);
-
-    // Simular distribución temporal basada en datos reales
-    const total = alta+media+baja;
-    const factor = total/150;
-    const vals = [8,14,22,35,50,68,85,100,115,125,135,total].map(v => Math.round(v*factor));
+function buildFocosChart() {
+    // Agrupar focos por hora (últimas 24h) usando edadH real
+    const ahora = new Date();
+    const horaActual = ahora.getHours();
+    const HORAS = Array.from({length:24},(_,i) => {
+        const h = (horaActual - 23 + i + 24) % 24;
+        return i % 4 === 0 ? `${String(h).padStart(2,'0')}h` : '';
+    });
+    const conteos = new Array(24).fill(0);
+    focosDataRaw.filter(f => f.edadH <= 24).forEach(f => {
+        if (!f.ts || isNaN(f.ts)) return;
+        const edadH = (Date.now() - f.ts) / 3600000;
+        const slot  = Math.min(23, Math.floor(23 - edadH));
+        if (slot >= 0) conteos[slot]++;
+    });
 
     if (focosChartInst) focosChartInst.destroy();
     focosChartInst = new Chart(document.getElementById('focosChart'), {
@@ -1300,13 +1425,22 @@ function buildFocosChart(alta, media, baja) {
         data:{
             labels: HORAS,
             datasets:[{
-                data: vals,
-                backgroundColor: vals.map((_,i) => i<4?'rgba(249,202,36,.6)':i<8?'rgba(232,93,4,.6)':'rgba(214,48,49,.6)'),
+                label: 'Focos/hora',
+                data: conteos,
+                backgroundColor: conteos.map((_,i) => {
+                    const edadSlot = 23 - i;
+                    return edadSlot <= 6  ? 'rgba(255,34,0,.75)'
+                         : edadSlot <= 12 ? 'rgba(255,119,0,.65)'
+                         : edadSlot <= 18 ? 'rgba(255,184,0,.55)'
+                         :                  'rgba(232,232,0,.45)';
+                }),
                 borderRadius:3,
             }]
         },
         options:{
-            plugins:{ legend:{ display:false } },
+            plugins:{ legend:{ display:false },
+                tooltip:{ callbacks:{ title: (items) => `Hace ~${23-items[0].dataIndex}h`, label: (i) => ` ${i.raw} focos` } }
+            },
             scales:{
                 x:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ display:false } },
                 y:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ color:'#162840' } },
@@ -1608,13 +1742,12 @@ async function refreshFocos() {
 // INIT
 // ═══════════════════════════════════════════════════
 async function init() {
-    // Clima Santa Cruz (tus coordenadas exactas de Open-Meteo)
     await fetchClima('Santa Cruz de la Sierra', null);
-    // Focos NASA FIRMS con tu key real
     await fetchFocosNASA();
-    // Auto-refresh cada 10 min
-    setInterval(refreshFocos, 10*60*1000);
-    setInterval(() => fetchClima('Santa Cruz de la Sierra', null), 30*60*1000);
+    // Focos cada 6 horas (NASA FIRMS actualiza ~4 veces/día)
+    setInterval(refreshFocos, 6 * 60 * 60 * 1000);
+    // Clima cada 30 min
+    setInterval(() => fetchClima('Santa Cruz de la Sierra', null), 30 * 60 * 1000);
 }
 
 
