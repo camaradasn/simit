@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camaradas de la Naturaleza - Bolivia 🇧🇴</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        :root {
+            --bg:       #060d18;
+            --panel:    #0a1628;
+            --card:     #0f1f35;
+            --border:   #162840;
+            --accent:   #e85d04;
+            --accent2:  #f48c06;
+            --green:    #00b894;
+            --blue:     #0984e3;
+            --red:      #d63031;
+            --text:     #cdd6e0;
+            --dim:      #4a6080;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            background: linear-gradient(135deg,#060d18,#0a1f3d,#060d18);
+            border-bottom: 2px solid var(--accent);
+            height: 58px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute; inset:0;
+            background: repeating-linear-gradient(90deg,transparent,transparent 80px,rgba(232,93,4,.03) 80px,rgba(232,93,4,.03) 81px);
+        }
+        .logo-box {
+            width:40px; height:40px;
+            background: linear-gradient(135deg,var(--accent),var(--accent2));
+            border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:1.3rem;
+            box-shadow:0 0 15px rgba(232,93,4,.4);
+            flex-shrink:0;
+        }
+        .header-title h1 { font-size:.95rem; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:1px; }
+        .header-title span { font-size:.65rem; color:var(--accent2); letter-spacing:2px; }
+
+        .stat-pill {
+            background:rgba(255,255,255,.05);
+            border:1px solid var(--border);
+            border-radius:20px;
+            padding:3px 12px;
+            text-align:center;
+            min-width:55px;
+        }
+        .stat-pill .num { font-size:1rem; font-weight:700; }
+        .stat-pill .lbl { font-size:.58rem; color:var(--dim); text-transform:uppercase; }
+
+        .live-badge {
+            display:flex; align-items:center; gap:6px;
+            background:rgba(0,184,148,.1);
+            border:1px solid var(--green);
+            border-radius:20px;
+            padding:4px 12px;
+            font-size:.7rem; color:var(--green);
+        }
+        .live-dot { width:8px; height:8px; background:var(--green); border-radius:50%; animation:blink 1.2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+        /* ── LAYOUT ── */
+        .workspace {
+            display:grid;
+            grid-template-columns: 255px 1fr 265px;
+            flex:1; overflow:hidden;
+        }
+
+        .panel {
+            background:var(--panel);
+            overflow-y:auto;
+            padding:8px;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+        .panel::-webkit-scrollbar { width:3px; }
+        .panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+        .panel-left  { border-right:1px solid var(--border); }
+        .panel-right { border-left:1px solid var(--border); }
+
+        /* ── CARDS ── */
+        .card {
+            background:var(--card);
+            border:1px solid var(--border);
+            border-radius:8px;
+            padding:10px 12px;
+        }
+        .card-hdr {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-bottom:9px;
+        }
+        .card-title {
+            font-size:.66rem; font-weight:600;
+            text-transform:uppercase; letter-spacing:1.5px;
+            color:var(--dim);
+            display:flex; align-items:center; gap:6px;
+        }
+        .card-title::before {
+            content:''; width:3px; height:10px;
+            background:var(--accent); border-radius:2px; display:block;
+        }
+        .badge {
+            font-size:.6rem; padding:2px 7px;
+            border-radius:10px; font-weight:600;
+        }
+
+        /* ── MAPA ── */
+        .map-area { position:relative; background:#060d18; }
+        #map { width:100%; height:100%; }
+
+        .map-toolbar {
+            position:absolute; top:10px; left:10px; z-index:1000;
+            display:flex; flex-direction:column; gap:5px;
+        }
+        .btn-group {
+            display:flex; gap:3px;
+            background:rgba(6,13,24,.92);
+            padding:4px; border-radius:6px;
+            border:1px solid var(--border);
+            backdrop-filter:blur(10px);
+        }
+        .mbtn {
+            background:transparent; border:1px solid transparent;
+            color:var(--dim); padding:5px 9px; border-radius:4px;
+            cursor:pointer; font-size:.7rem; transition:all .2s; white-space:nowrap;
+        }
+        .mbtn:hover { color:#fff; background:rgba(255,255,255,.06); }
+        .mbtn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+        .map-legend {
+            position:absolute; bottom:30px; left:10px; z-index:1000;
+            background:rgba(6,13,24,.92); border:1px solid var(--border);
+            border-radius:6px; padding:8px 12px; font-size:.67rem;
+            backdrop-filter:blur(10px); max-width:180px;
+        }
+        .legend-title { color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; font-size:.6rem; }
+        .leg-row { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+        .leg-dot { width:9px; height:9px; border-radius:50%; border:2px solid; flex-shrink:0; }
+
+        /* ── CLIMA ── */
+        .city-btns { display:flex; flex-wrap:wrap; gap:3px; }
+        .city-btn {
+            background:rgba(255,255,255,.04); border:1px solid var(--border);
+            color:var(--dim); padding:3px 7px; border-radius:12px;
+            cursor:pointer; font-size:.64rem; transition:all .2s;
+        }
+        .city-btn:hover,.city-btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+
+        .temp-hero { display:flex; align-items:center; gap:12px; padding:4px 0; }
+        .temp-num { font-size:3rem; font-weight:300; color:#fff; line-height:1; }
+        .temp-num sup { font-size:1.1rem; color:var(--accent); }
+
+        .wx-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:7px; }
+        .wx-item {
+            background:rgba(255,255,255,.03); border:1px solid var(--border);
+            border-radius:5px; padding:6px 8px;
+            display:flex; align-items:center; gap:6px;
+        }
+        .wx-val { font-size:.82rem; font-weight:600; color:#fff; }
+        .wx-lbl { font-size:.58rem; color:var(--dim); text-transform:uppercase; }
+
+        /* ── RIESGO ── */
+        .risk-item { margin-bottom:8px; }
+        .risk-hdr { display:flex; justify-content:space-between; font-size:.69rem; margin-bottom:3px; }
+        .risk-bar { height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+        .risk-fill { height:100%; border-radius:3px; transition:width 1.5s ease; }
+
+        /* ── FOCOS COUNTER ── */
+        .focos-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+        .foco-box {
+            background:rgba(255,255,255,.03); border-radius:6px;
+            padding:8px 4px; text-align:center; border-top:3px solid;
+        }
+        .foco-box.alta  { border-color:var(--red); }
+        .foco-box.media { border-color:var(--accent2); }
+        .foco-box.baja  { border-color:#f9ca24; }
+        .foco-num { font-size:1.9rem; font-weight:700; line-height:1; }
+        .alta  .foco-num { color:var(--red); }
+        .media .foco-num { color:var(--accent2); }
+        .baja  .foco-num { color:#f9ca24; }
+        .foco-lbl { font-size:.59rem; color:var(--dim); text-transform:uppercase; margin-top:3px; line-height:1.3; }
+
+        /* ── KML ── */
+        .kml-drop {
+            border:2px dashed var(--border); border-radius:7px;
+            padding:12px; text-align:center; cursor:pointer;
+            transition:all .3s; position:relative;
+        }
+        .kml-drop:hover,.kml-drop.dragover { border-color:var(--blue); background:rgba(9,132,227,.05); }
+        .kml-drop input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+        .kml-drop-txt { font-size:.7rem; color:var(--dim); line-height:1.6; }
+        .kml-drop-txt span { color:var(--blue); }
+
+        .kml-layers { display:flex; flex-direction:column; gap:4px; margin-top:7px; }
+        .kml-item {
+            display:flex; align-items:center; justify-content:space-between;
+            background:rgba(9,132,227,.07); border:1px solid rgba(9,132,227,.2);
+            border-radius:5px; padding:5px 8px; font-size:.7rem;
+        }
+        .kml-item-left { display:flex; align-items:center; gap:6px; flex:1; min-width:0; }
+        .kml-swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+        .kml-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .kml-ctls { display:flex; gap:3px; flex-shrink:0; }
+        .kbtn {
+            background:transparent; border:1px solid var(--border);
+            color:var(--dim); padding:2px 5px; border-radius:3px;
+            cursor:pointer; font-size:.62rem; transition:all .2s;
+        }
+        .kbtn:hover { color:#fff; border-color:#fff; }
+        .kbtn.del:hover { color:var(--red); border-color:var(--red); }
+
+        .kml-url-row { display:flex; gap:5px; margin-top:7px; }
+        .kml-url-row input {
+            flex:1; background:var(--bg); border:1px solid var(--border);
+            color:#fff; padding:6px 9px; border-radius:5px; font-size:.7rem; outline:none;
+        }
+        .kml-url-row input:focus { border-color:var(--blue); }
+        .kml-url-row button {
+            background:var(--blue); border:none; color:#fff;
+            padding:6px 10px; border-radius:5px; cursor:pointer; font-size:.7rem;
+        }
+
+        /* ── ALERTAS ── */
+        .alertas { display:flex; flex-direction:column; gap:4px; max-height:175px; overflow-y:auto; }
+        .alerta {
+            display:flex; gap:7px; align-items:flex-start;
+            padding:6px 8px; border-radius:5px; font-size:.7rem;
+            border-left:3px solid; cursor:pointer; transition:filter .2s;
+        }
+        .alerta:hover { filter:brightness(1.2); }
+        .alerta.rojo    { background:rgba(214,48,49,.08);  border-color:var(--red); }
+        .alerta.naranja { background:rgba(232,93,4,.08);   border-color:var(--accent); }
+        .alerta.amarillo{ background:rgba(249,202,36,.08); border-color:#f9ca24; }
+        .al-badge {
+            font-size:.58rem; font-weight:700; padding:1px 5px;
+            border-radius:3px; white-space:nowrap; margin-top:1px;
+        }
+        .rojo    .al-badge { background:var(--red);    color:#fff; }
+        .naranja .al-badge { background:var(--accent); color:#fff; }
+        .amarillo .al-badge { background:#f9ca24;      color:#000; }
+        .al-txt { flex:1; line-height:1.4; }
+        .al-hora { color:var(--dim); font-size:.6rem; white-space:nowrap; }
+
+        /* ── DEPARTAMENTOS ── */
+        .dept-item { display:flex; align-items:center; gap:7px; font-size:.72rem; margin-bottom:4px; }
+        .dept-name { flex:1; }
+        .dept-bar-wrap { width:75px; height:4px; background:rgba(255,255,255,.05); border-radius:2px; overflow:hidden; }
+        .dept-bar { height:100%; border-radius:2px; }
+        .dept-count { min-width:22px; text-align:right; font-weight:600; font-size:.72rem; }
+
+        /* ── SATÉLITES ── */
+        .sat-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+        .sat-item { background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:5px; padding:6px 8px; font-size:.67rem; }
+        .sat-name { font-weight:600; color:#fff; margin-bottom:2px; }
+        .sat-info { color:var(--dim); font-size:.6rem; }
+        .dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:4px; }
+        .dot.ok   { background:var(--green); }
+        .dot.warn { background:var(--accent2); animation:blink 1s infinite; }
+        .dot.err  { background:var(--red); }
+
+        /* ── FORECAST ── */
+        .fc-row { display:flex; justify-content:space-between; gap:3px; }
+        .fc-day { flex:1; text-align:center; background:rgba(255,255,255,.03); border-radius:6px; padding:6px 2px; font-size:.63rem; }
+        .fc-day .fd-name { color:var(--dim); text-transform:uppercase; margin-bottom:2px; }
+        .fc-day .fd-icon { font-size:.95rem; margin:2px 0; }
+        .fc-day .fd-hi   { color:var(--accent); font-weight:600; }
+        .fc-day .fd-lo   { color:var(--dim); }
+
+        /* ── API STATUS ── */
+        .api-row {
+            display:flex; align-items:center; justify-content:space-between;
+            font-size:.68rem; padding:4px 0;
+            border-bottom:1px solid rgba(255,255,255,.03);
+        }
+        .api-row:last-child { border-bottom:none; }
+
+        /* ── SOIL DATA ── */
+        .soil-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+        .soil-item {
+            background:rgba(255,255,255,.03); border:1px solid var(--border);
+            border-radius:5px; padding:7px 8px; text-align:center;
+        }
+        .soil-val { font-size:.95rem; font-weight:600; color:#fff; }
+        .soil-lbl { font-size:.58rem; color:var(--dim); text-transform:uppercase; margin-top:2px; line-height:1.3; }
+
+        /* ── LOADING ── */
+        .loading { display:flex; align-items:center; justify-content:center; gap:7px; padding:12px; color:var(--dim); font-size:.72rem; }
+        .spin { width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        canvas { max-height:130px; }
+
+        /* ── POPUP ── */
+        .leaflet-popup-content-wrapper {
+            background:var(--card) !important; border:1px solid var(--border) !important;
+            box-shadow:0 4px 20px rgba(0,0,0,.6) !important; border-radius:8px !important;
+            color:var(--text) !important;
+        }
+        .leaflet-popup-tip { background:var(--card) !important; }
+        .leaflet-popup-content { margin:12px !important; font-family:'Segoe UI',sans-serif !important; }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div style="display:flex;align-items:center;gap:10px;z-index:1;">
+        <div class="logo-box">🌿</div>
+        <div class="header-title">
+            <h1>Camaradas de la Naturaleza</h1>
+            <span>Sistema de Monitoreo Ambiental · Bolivia 🇧🇴</span>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;z-index:1;" id="header-stats">
+        <div class="stat-pill"><div class="num" style="color:var(--red);" id="h-alta">—</div><div class="lbl">Alta</div></div>
+        <div class="stat-pill"><div class="num" style="color:var(--accent2);" id="h-media">—</div><div class="lbl">Media</div></div>
+        <div class="stat-pill"><div class="num" style="color:#f9ca24;" id="h-baja">—</div><div class="lbl">Baja</div></div>
+        <div class="stat-pill"><div class="num" style="color:#fff;" id="h-total">—</div><div class="lbl">Total</div></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;z-index:1;">
+        <div class="live-badge"><div class="live-dot"></div>EN VIVO</div>
+        <div style="font-size:.75rem;color:var(--dim);font-family:monospace;" id="clock">--:--:--</div>
+    </div>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+    <!-- ═══════════════ PANEL IZQUIERDO ═══════════════ -->
+    <div class="panel panel-left">
+
+        <!-- Clima -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">🌡️ Clima Actual</div>
+            </div>
+            <div class="city-btns">
+                <button class="city-btn active" onclick="fetchClima('Santa Cruz de la Sierra',this)">Santa Cruz</button>
+                <button class="city-btn" onclick="fetchClima('La Paz',this)">La Paz</button>
+                <button class="city-btn" onclick="fetchClima('Cochabamba',this)">Cochabamba</button>
+                <button class="city-btn" onclick="fetchClima('Trinidad',this)">Trinidad</button>
+                <button class="city-btn" onclick="fetchClima('Riberalta',this)">Riberalta</button>
+                <button class="city-btn" onclick="fetchClima('Cobija',this)">Cobija</button>
+                <button class="city-btn" onclick="fetchClima('Sucre',this)">Sucre</button>
+                <button class="city-btn" onclick="fetchClima('Tarija',this)">Tarija</button>
+            </div>
+            <div id="clima-box" style="margin-top:8px;">
+                <div class="loading"><div class="spin"></div>Cargando clima...</div>
+            </div>
+        </div>
+
+        <!-- Suelo -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">🌱 Datos de Suelo</div>
+                <span class="badge" style="background:rgba(0,184,148,.15);color:var(--green);">Open-Meteo</span>
+            </div>
+            <div class="soil-grid" id="soil-box">
+                <div class="loading"><div class="spin"></div></div>
+            </div>
+        </div>
+
+        <!-- Índices riesgo -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">⚠️ Índices de Riesgo</div>
+                <span class="badge" id="riesgo-badge" style="background:rgba(214,48,49,.15);color:var(--red);">—</span>
+            </div>
+            <div class="risk-item">
+                <div class="risk-hdr"><span>🔥 Riesgo Incendio</span><span id="ri-lbl" style="font-weight:600;">—</span></div>
+                <div class="risk-bar"><div class="risk-fill" id="ri-bar" style="width:0%;background:linear-gradient(90deg,#e17055,#d63031);"></div></div>
+            </div>
+            <div class="risk-item">
+                <div class="risk-hdr"><span>💧 Humedad Suelo</span><span id="hs-lbl">—</span></div>
+                <div class="risk-bar"><div class="risk-fill" id="hs-bar" style="width:0%;background:linear-gradient(90deg,#00b894,#00cec9);"></div></div>
+            </div>
+            <div class="risk-item">
+                <div class="risk-hdr"><span>🌬️ Factor Viento</span><span id="fv-lbl">—</span></div>
+                <div class="risk-bar"><div class="risk-fill" id="fv-bar" style="width:0%;background:linear-gradient(90deg,#74b9ff,#0984e3);"></div></div>
+            </div>
+            <div class="risk-item" style="margin-bottom:0">
+                <div class="risk-hdr"><span>🌡️ Temp Suelo 6cm</span><span id="ts-lbl">—</span></div>
+                <div class="risk-bar"><div class="risk-fill" id="ts-bar" style="width:0%;background:linear-gradient(90deg,#fdcb6e,#e17055);"></div></div>
+            </div>
+        </div>
+
+        <!-- Temperatura chart -->
+        <div class="card">
+            <div class="card-title">📈 Temperatura 12h</div>
+            <canvas id="tempChart" style="margin-top:8px;"></canvas>
+        </div>
+
+        <!-- Pronóstico -->
+        <div class="card">
+            <div class="card-hdr"><div class="card-title">🗓️ Pronóstico 5 días</div></div>
+            <div class="fc-row" id="forecast-row">
+                <div class="loading"><div class="spin"></div></div>
+            </div>
+        </div>
+
+        <!-- Satélites -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">🛰️ Satélites</div>
+                <span style="font-size:.62rem;color:var(--green);">4/5 online</span>
+            </div>
+            <div class="sat-grid">
+                <div class="sat-item"><div class="sat-name"><span class="dot ok"></span>VIIRS NOAA-20</div><div class="sat-info">Última pasada: 8 min</div></div>
+                <div class="sat-item"><div class="sat-name"><span class="dot ok"></span>MODIS Terra</div><div class="sat-info">Última pasada: 22 min</div></div>
+                <div class="sat-item"><div class="sat-name"><span class="dot ok"></span>GOES-16 ABI</div><div class="sat-info">Ciclo: 10 min</div></div>
+                <div class="sat-item"><div class="sat-name"><span class="dot ok"></span>Suomi NPP</div><div class="sat-info">Última pasada: 35 min</div></div>
+                <div class="sat-item"><div class="sat-name"><span class="dot err"></span>Sentinel-3</div><div class="sat-info">Sin señal</div></div>
+                <div class="sat-item"><div class="sat-name"><span class="dot warn"></span>MODIS Aqua</div><div class="sat-info">En espera...</div></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══════════════ MAPA CENTRAL ═══════════════ -->
+    <div class="map-area">
+        <div class="map-toolbar">
+            <!-- Capas base -->
+            <div class="btn-group">
+                <button class="mbtn active" onclick="setLayer('sat',this)">🛰️ Satélite</button>
+                <button class="mbtn" onclick="setLayer('topo',this)">⛰️ Topo</button>
+                <button class="mbtn" onclick="setLayer('osm',this)">🗺️ OSM</button>
+                <button class="mbtn" onclick="setLayer('dark',this)">🌙 Dark</button>
+            </div>
+            <!-- Overlays -->
+            <div class="btn-group">
+                <button class="mbtn active" id="btn-focos"  onclick="toggleLayer('focos',this)">🔥 Focos</button>
+                <button class="mbtn active" id="btn-heat"   onclick="toggleLayer('heat',this)">🌡️ Calor</button>
+                <button class="mbtn active" id="btn-est"    onclick="toggleLayer('est',this)">📡 Estaciones</button>
+            </div>
+            <!-- KML toggles -->
+            <div class="btn-group" id="kml-toggle-group">
+                <button class="mbtn" id="btn-kml-prov"   onclick="toggleKMLGroup('prov',this)"   disabled>🗂️ Provincias</button>
+                <button class="mbtn" id="btn-kml-mun"    onclick="toggleKMLGroup('mun',this)"    disabled>🏘️ Municipios</button>
+                <button class="mbtn" id="btn-kml-tco"    onclick="toggleKMLGroup('tco',this)"    disabled>🌿 TCO</button>
+                <button class="mbtn" id="btn-kml-com"    onclick="toggleKMLGroup('com',this)"    disabled>🏡 Comunidades</button>
+            </div>
+            <!-- Acciones -->
+            <div class="btn-group">
+                <button class="mbtn" onclick="refreshFocos()">🔄 Actualizar</button>
+                <button class="mbtn" onclick="fitBolivia()">🇧🇴 Bolivia</button>
+                <button class="mbtn" onclick="exportCSV()">💾 CSV</button>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="map-legend">
+            <div class="legend-title">🔥 Focos de Calor</div>
+            <div class="leg-row"><div class="leg-dot" style="background:#ff4500;border-color:#ff0000;"></div><span>Alta intensidad (&gt;400K)</span></div>
+            <div class="leg-row"><div class="leg-dot" style="background:#ffa500;border-color:#ff8c00;"></div><span>Media (300–400K)</span></div>
+            <div class="leg-row"><div class="leg-dot" style="background:#ffd700;border-color:#e6c000;"></div><span>Baja (&lt;300K)</span></div>
+            <div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px;">
+                <div class="legend-title">📂 Capas KML</div>
+                <div id="kml-legend-items" style="font-size:.62rem;color:var(--dim);">Sin capas cargadas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════ PANEL DERECHO ═══════════════ -->
+    <div class="panel panel-right">
+
+        <!-- Contadores focos -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">🔥 Focos Detectados</div>
+                <span style="font-size:.6rem;color:var(--dim);" id="focos-ts">—</span>
+            </div>
+            <div class="focos-grid">
+                <div class="foco-box alta"><div class="foco-num" id="f-alta">—</div><div class="foco-lbl">Alta<br>Intensidad</div></div>
+                <div class="foco-box media"><div class="foco-num" id="f-media">—</div><div class="foco-lbl">Media<br>Intensidad</div></div>
+                <div class="foco-box baja"><div class="foco-num" id="f-baja">—</div><div class="foco-lbl">Baja<br>Intensidad</div></div>
+            </div>
+            <div style="text-align:center;margin-top:8px;font-size:.73rem;color:var(--dim);">
+                Total: <b style="color:#fff;font-size:1.1rem;" id="f-total">—</b> focos en Bolivia
+            </div>
+        </div>
+
+        <!-- Cargar KML -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">📂 Capas KML</div>
+                <button class="kbtn" onclick="loadDemoKML()" style="font-size:.62rem;">+ Demo</button>
+            </div>
+
+            <!-- Dropzone con selector de tipo -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+                <div>
+                    <label style="font-size:.62rem;color:var(--dim);display:block;margin-bottom:3px;">Tipo de capa:</label>
+                    <select id="kml-tipo" style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 7px;border-radius:5px;font-size:.7rem;outline:none;">
+                        <option value="prov">🗂️ Provincias</option>
+                        <option value="mun">🏘️ Municipios</option>
+                        <option value="tco">🌿 TCO</option>
+                        <option value="com">🏡 Comunidades</option>
+                        <option value="otro">📄 Otro</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:.62rem;color:var(--dim);display:block;margin-bottom:3px;">Nombre:</label>
+                    <input type="text" id="kml-nombre" placeholder="Ej: Provincias SC"
+                           style="width:100%;background:var(--bg);border:1px solid var(--border);color:#fff;padding:5px 7px;border-radius:5px;font-size:.7rem;outline:none;"/>
+                </div>
+            </div>
+
+            <div class="kml-drop" id="kml-drop">
+                <input type="file" id="kml-file" accept=".kml,.kmz" multiple onchange="handleKMLFiles(event)"/>
+                <div style="font-size:1.4rem;margin-bottom:4px;">📁</div>
+                <div class="kml-drop-txt">Arrastra <span>KML / KMZ</span> aquí<br>o haz clic para seleccionar</div>
+            </div>
+
+            <div class="kml-layers" id="kml-layers-list"></div>
+
+            <div class="kml-url-row" style="margin-top:7px;">
+                <input type="text" id="kml-url" placeholder="URL de KML remoto..."/>
+                <button onclick="loadKMLFromURL()">🌐</button>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div class="card">
+            <div class="card-hdr">
+                <div class="card-title">🚨 Alertas Activas</div>
+                <span class="badge" id="alert-count" style="background:rgba(214,48,49,.15);color:var(--red);">0</span>
+            </div>
+            <div class="alertas" id="alertas-lista"></div>
+        </div>
+
+        <!-- Por departamento -->
+        <div class="card">
+            <div class="card-hdr"><div class="card-title">🗺️ Por Departamento</div></div>
+            <div id="dept-list"><div class="loading"><div class="spin"></div>Cargando...</div></div>
+        </div>
+
+        <!-- Focos chart -->
+        <div class="card">
+            <div class="card-title">📊 Focos por Hora (hoy)</div>
+            <canvas id="focosChart" style="margin-top:8px;"></canvas>
+        </div>
+
+        <!-- Estado APIs -->
+        <div class="card">
+            <div class="card-hdr"><div class="card-title">🔌 Estado APIs</div></div>
+            <div class="api-row"><span><span class="dot ok" id="d-nasa"></span>NASA FIRMS</span><span style="font-size:.62rem;" id="t-nasa">Conectando...</span></div>
+            <div class="api-row"><span><span class="dot ok" id="d-meteo"></span>Open-Meteo</span><span style="font-size:.62rem;color:var(--green);" id="t-meteo">Activo ✓</span></div>
+            <div class="api-row"><span><span class="dot ok" id="d-inpe"></span>INPE Brasil</span><span style="font-size:.62rem;color:var(--green);" id="t-inpe">Activo ✓</span></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// CONFIGURACIÓN — TUS DATOS REALES
+// ═══════════════════════════════════════════════════
+const CFG = {
+    NASA_KEY: '1c698bed2f48f1e8c67c5a728efaf236',
+
+    // Bounding Box Bolivia completa
+    BBOX: { west:-69.6, south:-22.9, east:-57.5, north:-9.7 },
+
+    // Coordenadas Open-Meteo que proporcionaste (Santa Cruz)
+    METEO_LAT:  -17.7863,
+    METEO_LNG:  -63.1812,
+
+    MAP_CENTER: [-16.5, -64.5],
+    MAP_ZOOM:   6,
+
+    CIUDADES: {
+        'Santa Cruz de la Sierra': { lat:-17.7863, lng:-63.1812 },
+        'La Paz':                  { lat:-16.495,  lng:-68.133  },
+        'Cochabamba':              { lat:-17.393,  lng:-66.157  },
+        'Trinidad':                { lat:-14.832,  lng:-64.898  },
+        'Riberalta':               { lat:-10.997,  lng:-66.071  },
+        'Cobija':                  { lat:-11.026,  lng:-68.742  },
+        'Sucre':                   { lat:-19.033,  lng:-65.262  },
+        'Tarija':                  { lat:-21.535,  lng:-64.729  },
+    },
+
+    // Colores por tipo KML
+    KML_COLORS: {
+        prov:  '#0984e3',
+        mun:   '#00b894',
+        tco:   '#e17055',
+        com:   '#a29bfe',
+        otro:  '#fdcb6e',
+    },
+
+    // Departamentos Bolivia
+    DEPTS: ['Santa Cruz','Beni','La Paz','Cochabamba','Pando','Tarija','Chuquisaca','Oruro','Potosí'],
+    DEPT_BOUNDS: {
+        'Santa Cruz':  { s:-22,   n:-13,  w:-65,   e:-57.5 },
+        'Beni':        { s:-16,   n:-9.7, w:-68,   e:-62   },
+        'La Paz':      { s:-18,   n:-13,  w:-69.6, e:-66   },
+        'Cochabamba':  { s:-18.5, n:-15,  w:-66,   e:-64   },
+        'Pando':       { s:-13,   n:-9.7, w:-69.6, e:-65   },
+        'Tarija':      { s:-22.9, n:-20,  w:-65,   e:-62   },
+        'Chuquisaca':  { s:-21,   n:-18,  w:-65,   e:-62   },
+        'Oruro':       { s:-20,   n:-17,  w:-68,   e:-65   },
+        'Potosí':      { s:-22,   n:-18,  w:-68,   e:-64   },
+    }
+};
+
+// ═══════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ═══════════════════════════════════════════════════
+let focosData  = [];
+let tempChartInst  = null;
+let focosChartInst = null;
+const kmlStore = {};   // { id: { layer, name, tipo, color, visible } }
+let kmlIdSeq   = 0;
+
+// ═══════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════
+const map = L.map('map', {
+    center:      CFG.MAP_CENTER,
+    zoom:        CFG.MAP_ZOOM,
+    zoomControl: false
+});
+L.control.zoom({ position:'bottomright' }).addTo(map);
+
+const tileLayers = {
+    sat:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',  { attribution:'© ESRI' }),
+    topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { attribution:'© ESRI' }),
+    osm:  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',                                            { attribution:'© OSM'  }),
+    dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',                                  { attribution:'© CartoDB' }),
+};
+tileLayers.sat.addTo(map);
+let currentTile = 'sat';
+
+// Layer groups
+const LG = {
+    focos: L.layerGroup().addTo(map),
+    heat:  null,
+    est:   L.layerGroup().addTo(map),
+};
+
+// KML grupos por tipo
+const kmlGroups = {
+    prov: L.layerGroup(),
+    mun:  L.layerGroup(),
+    tco:  L.layerGroup(),
+    com:  L.layerGroup(),
+    otro: L.layerGroup(),
+};
+
+function setLayer(name, btn) {
+    map.removeLayer(tileLayers[currentTile]);
+    tileLayers[name].addTo(map);
+    currentTile = name;
+    document.querySelectorAll('.btn-group:first-child .mbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function fitBolivia() {
+    map.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]);
+}
+
+function toggleLayer(name, btn) {
+    if (name === 'heat') {
+        if (!LG.heat) return;
+        if (map.hasLayer(LG.heat)) { map.removeLayer(LG.heat); btn.classList.remove('active'); }
+        else { LG.heat.addTo(map); btn.classList.add('active'); }
+        return;
+    }
+    const lg = LG[name];
+    if (!lg) return;
+    if (map.hasLayer(lg)) { map.removeLayer(lg); btn.classList.remove('active'); }
+    else { lg.addTo(map); btn.classList.add('active'); }
+}
+
+function toggleKMLGroup(tipo, btn) {
+    const g = kmlGroups[tipo];
+    if (!g) return;
+    if (map.hasLayer(g)) { map.removeLayer(g); btn.classList.remove('active'); }
+    else { g.addTo(map); btn.classList.add('active'); }
+}
+
+// ═══════════════════════════════════════════════════
+// NASA FIRMS — FOCOS REALES
+// ═══════════════════════════════════════════════════
+async function fetchFocosNASA() {
+    const { west, south, east, north } = CFG.BBOX;
+    // Fuente VIIRS NOAA-20 NRT (más actualizada)
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${CFG.NASA_KEY}/VIIRS_NOAA20_NRT/${west},${south},${east},${north}/1`;
+
+    setAPIStatus('nasa', 'warn', 'Conectando...');
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+
+        focosData = parsed.data
+            .map(r => ({
+                lat:        parseFloat(r.latitude),
+                lng:        parseFloat(r.longitude),
+                brightness: parseFloat(r.bright_ti4 || r.brightness || 300),
+                frp:        parseFloat(r.frp || 0),
+                fecha:      r.acq_date  || '—',
+                hora:       r.acq_time  || '—',
+                satellite:  r.satellite || 'VIIRS',
+                confidence: r.confidence|| 'n',
+            }))
+            .filter(f => !isNaN(f.lat) && !isNaN(f.lng));
+
+        setAPIStatus('nasa', 'ok', `${focosData.length} focos ✓`);
+        renderFocos();
+        updateCounters();
+        renderDepts();
+        renderAlertas();
+
+    } catch (err) {
+        console.warn('NASA FIRMS error:', err.message);
+        setAPIStatus('nasa', 'err', 'Error — usando demo');
+        useDemoFocos();
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// DEMO FOCOS (fallback)
+// ═══════════════════════════════════════════════════
+function useDemoFocos() {
+    const zonas = [
+        { latC:-17.5, lngC:-61.5, r:3,   p:.35, dept:'Santa Cruz' },
+        { latC:-18.2, lngC:-59.8, r:2,   p:.12, dept:'Santa Cruz' },
+        { latC:-14.5, lngC:-65.0, r:3,   p:.22, dept:'Beni'       },
+        { latC:-13.2, lngC:-63.8, r:2,   p:.10, dept:'Beni'       },
+        { latC:-16.2, lngC:-67.5, r:1.5, p:.07, dept:'La Paz'     },
+        { latC:-17.5, lngC:-64.8, r:1,   p:.06, dept:'Cochabamba' },
+        { latC:-11.5, lngC:-67.5, r:1.5, p:.05, dept:'Pando'      },
+        { latC:-21.0, lngC:-63.8, r:1,   p:.03, dept:'Tarija'     },
+    ];
+
+    focosData = [];
+    for (let i = 0; i < 150; i++) {
+        let acc=0, zona=zonas[0];
+        const rand=Math.random();
+        for (const z of zonas) { acc+=z.p; if(rand<acc){zona=z;break;} }
+        const angle=Math.random()*2*Math.PI, dist=Math.random()*zona.r;
+        focosData.push({
+            lat:        zona.latC + dist*Math.sin(angle),
+            lng:        zona.lngC + dist*Math.cos(angle),
+            brightness: 260 + Math.random()*230,
+            frp:        Math.random()*200,
+            fecha:      new Date().toISOString().slice(0,10),
+            hora:       String(Math.floor(Math.random()*24)).padStart(2,'0')+'00',
+            satellite:  ['VIIRS','MODIS','GOES-16'][Math.floor(Math.random()*3)],
+            confidence: ['l','n','h'][Math.floor(Math.random()*3)],
+            dept:       zona.dept,
+        });
+    }
+
+    setAPIStatus('nasa', 'warn', 'Modo demo activo');
+    renderFocos();
+    updateCounters();
+    renderDepts();
+    renderAlertas();
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER FOCOS EN MAPA
+// ═══════════════════════════════════════════════════
+function getIntensidad(b) {
+    return b >= 380 ? 'alta' : b >= 310 ? 'media' : 'baja';
+}
+
+const FOCO_CFG = {
+    alta:  { color:'#ff0000', fill:'#ff4500', r:10 },
+    media: { color:'#ff8c00', fill:'#ffa500', r: 7 },
+    baja:  { color:'#e6c000', fill:'#ffd700', r: 5 },
+};
+
+function renderFocos() {
+    LG.focos.clearLayers();
+    const heat = [];
+
+    focosData.forEach(f => {
+        const intens = getIntensidad(f.brightness);
+        const c = FOCO_CFG[intens];
+
+        const circle = L.circleMarker([f.lat, f.lng], {
+            radius:      c.r,
+            color:       c.color,
+            fillColor:   c.fill,
+            fillOpacity: 0.85,
+            weight:      1.5,
+        });
+
+        circle.bindPopup(buildPopup(f, intens, c.fill), { maxWidth:230 });
+        LG.focos.addLayer(circle);
+
+        heat.push([f.lat, f.lng, intens==='alta'?1:intens==='media'?.6:.3]);
+    });
+
+    if (LG.heat) map.removeLayer(LG.heat);
+    LG.heat = L.heatLayer(heat, {
+        radius:25, blur:20, maxZoom:10,
+        gradient:{ 0.2:'#ffd700', 0.5:'#ff6b35', 0.8:'#ff0000', 1:'#800000' }
+    }).addTo(map);
+}
+
+function buildPopup(f, intens, color) {
+    const conf = { l:'Baja', n:'Nominal', h:'Alta' }[f.confidence] || '—';
+    return `
+    <div style="font-size:.78rem;min-width:190px;">
+        <div style="color:${color};font-weight:700;font-size:.88rem;margin-bottom:8px;">🔥 Foco de Calor — ${intens.toUpperCase()}</div>
+        <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:var(--dim);padding:2px 0;">🌡️ Brillo</td><td style="color:${color};font-weight:600;">${f.brightness.toFixed(0)} K</td></tr>
+            <tr><td style="color:var(--dim);">⚡ FRP</td><td>${f.frp.toFixed(1)} MW</td></tr>
+            <tr><td style="color:var(--dim);">🛰️ Satélite</td><td>${f.satellite}</td></tr>
+            <tr><td style="color:var(--dim);">📍 Coords</td><td>${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}</td></tr>
+            <tr><td style="color:var(--dim);">📅 Fecha</td><td>${f.fecha} ${f.hora}h</td></tr>
+            <tr><td style="color:var(--dim);">🎯 Confianza</td><td>${conf}</td></tr>
+        </table>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// CONTADORES
+// ═══════════════════════════════════════════════════
+function updateCounters() {
+    const alta  = focosData.filter(f => getIntensidad(f.brightness)==='alta').length;
+    const media = focosData.filter(f => getIntensidad(f.brightness)==='media').length;
+    const baja  = focosData.filter(f => getIntensidad(f.brightness)==='baja').length;
+    const total = focosData.length;
+
+    ['alta','media','baja'].forEach(k => {
+        const v = k==='alta'?alta:k==='media'?media:baja;
+        document.getElementById('f-'+k).textContent = v;
+        document.getElementById('h-'+k).textContent = v;
+    });
+    document.getElementById('f-total').textContent = total;
+    document.getElementById('h-total').textContent = total;
+    document.getElementById('focos-ts').textContent = 'Act: ' + new Date().toLocaleTimeString('es-BO');
+
+    buildFocosChart(alta, media, baja);
+}
+
+// ═══════════════════════════════════════════════════
+// DEPARTAMENTOS
+// ═══════════════════════════════════════════════════
+function getDept(f) {
+    if (f.dept) return f.dept;
+    for (const [dept, b] of Object.entries(CFG.DEPT_BOUNDS)) {
+        if (f.lat>=b.s && f.lat<=b.n && f.lng>=b.w && f.lng<=b.e) return dept;
+    }
+    return 'Otro';
+}
+
+function renderDepts() {
+    const counts = {};
+    CFG.DEPTS.forEach(d => counts[d]=0);
+    focosData.forEach(f => { const d=getDept(f); if(counts[d]!==undefined) counts[d]++; });
+
+    const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    const maxVal = sorted[0]?.[1] || 1;
+    const COLS   = ['#ff4500','#ff6b35','#ffa500','#f9ca24','#00b894','#0984e3','#6c5ce7','#fd79a8','#b2bec3'];
+
+    document.getElementById('dept-list').innerHTML = sorted.map(([dept, count], i) => `
+        <div class="dept-item">
+            <span class="dept-name">${dept}</span>
+            <div class="dept-bar-wrap">
+                <div class="dept-bar" style="width:${(count/maxVal*100).toFixed(0)}%;background:${COLS[i]};"></div>
+            </div>
+            <span class="dept-count" style="color:${COLS[i]};">${count}</span>
+        </div>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// ALERTAS AUTOMÁTICAS
+// ═══════════════════════════════════════════════════
+function renderAlertas() {
+    const alertas = [];
+    const alta = focosData.filter(f => getIntensidad(f.brightness)==='alta');
+    const chiq  = focosData.filter(f => f.lat<-14 && f.lat>-20 && f.lng>-65 && f.lng<-58);
+    const beni  = focosData.filter(f => f.lat>-16 && f.lat<-10 && f.lng>-68 && f.lng<-62);
+
+    if (alta.length > 15) alertas.push({ nivel:'rojo',    txt:`🔴 ${alta.length} focos de ALTA intensidad detectados en Bolivia`, hora:'Ahora'      });
+    if (chiq.length > 10) alertas.push({ nivel:'rojo',    txt:`⚠️ Concentración crítica en Chiquitanía: ${chiq.length} focos`,   hora:'Ahora'      });
+    if (beni.length >  8) alertas.push({ nivel:'naranja', txt:`🟠 Actividad elevada en Beni: ${beni.length} focos`,               hora:'Hace 5 min' });
+    if (focosData.length > 80) alertas.push({ nivel:'naranja', txt:`📊 Total superior a 80 focos activos — monitoreo intensivo`,  hora:'Hace 8 min' });
+
+    alertas.push(
+        { nivel:'naranja', txt:'🌬️ Vientos favorables a propagación en zona este',     hora:'Hace 15 min' },
+        { nivel:'amarillo',txt:'📡 VIIRS NOAA-20 pasará sobre Bolivia en ~25 min',      hora:'Hace 18 min' },
+        { nivel:'amarillo',txt:'💧 Humedad relativa baja (<35%) en Chiquitanía',        hora:'Hace 25 min' },
+    );
+
+    document.getElementById('alertas-lista').innerHTML = alertas.map(a => `
+        <div class="alerta ${a.nivel}">
+            <span class="al-badge">${a.nivel.toUpperCase()}</span>
+            <span class="al-txt">${a.txt}</span>
+            <span class="al-hora">${a.hora}</span>
+        </div>
+    `).join('');
+
+    document.getElementById('alert-count').textContent = alertas.length;
+}
+
+// ═══════════════════════════════════════════════════
+// OPEN-METEO — CLIMA REAL
+// ═══════════════════════════════════════════════════
+const climaCache = {};
+
+async function fetchClima(ciudad, btn) {
+    document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    if (climaCache[ciudad]) { renderClima(climaCache[ciudad], ciudad); return; }
+
+    const coords = CFG.CIUDADES[ciudad];
+    if (!coords) return;
+
+    document.getElementById('clima-box').innerHTML = '<div class="loading"><div class="spin"></div>Cargando...</div>';
+
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?`
+            + `latitude=${coords.lat}&longitude=${coords.lng}`
+            + `&hourly=temperature_2m,precipitation_probability,relative_humidity_2m,`
+            + `apparent_temperature,wind_speed_10m,temperature_80m,`
+            + `soil_moisture_9_to_27cm,soil_temperature_6cm`
+            + `&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum`
+            + `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,`
+            + `precipitation,weather_code,apparent_temperature,wind_direction_10m`
+            + `&timezone=America%2FLa_Paz&forecast_days=5`;
+
+        const resp = await fetch(url);
+        const data = await resp.json();
+        climaCache[ciudad] = data;
+        renderClima(data, ciudad);
+        renderForecast(data);
+        buildTempChart(data);
+        renderSoilData(data);
+        updateRiesgo(data);
+
+    } catch (err) {
+        document.getElementById('clima-box').innerHTML =
+            `<div style="color:var(--red);font-size:.74rem;padding:8px;">Error: ${err.message}</div>`;
+    }
+}
+
+function wmo(code) {
+    if (code <= 1)  return { icon:'☀️',  desc:'Despejado'     };
+    if (code <= 3)  return { icon:'⛅',  desc:'Nublado parcial'};
+    if (code <= 48) return { icon:'🌫️', desc:'Niebla'         };
+    if (code <= 57) return { icon:'🌦️', desc:'Llovizna'       };
+    if (code <= 67) return { icon:'🌧️', desc:'Lluvia'         };
+    if (code <= 77) return { icon:'❄️',  desc:'Nevada'         };
+    if (code <= 82) return { icon:'🌦️', desc:'Chubascos'      };
+    if (code <= 99) return { icon:'⛈️', desc:'Tormenta'       };
+    return { icon:'🌤️', desc:'Variable' };
+}
+
+function windDir(deg) {
+    return ['N','NE','E','SE','S','SO','O','NO'][Math.round(deg/45)%8];
+}
+
+function renderClima(data, ciudad) {
+    const c = data.current;
+    const w = wmo(c.weather_code);
+    document.getElementById('clima-box').innerHTML = `
+        <div class="temp-hero">
+            <div style="font-size:2.4rem;">${w.icon}</div>
+            <div>
+                <div class="temp-num">${Math.round(c.temperature_2m)}<sup>°C</sup></div>
+                <div style="font-size:.75rem;color:#fff;font-weight:600;">📍 ${ciudad}</div>
+                <div style="font-size:.68rem;color:var(--dim);">${w.desc}</div>
+                <div style="font-size:.68rem;color:var(--accent2);">Sensación: ${Math.round(c.apparent_temperature)}°C</div>
+            </div>
+        </div>
+        <div class="wx-grid">
+            <div class="wx-item"><span style="font-size:1rem;">💧</span><div><div class="wx-val">${c.relative_humidity_2m}%</div><div class="wx-lbl">Humedad</div></div></div>
+            <div class="wx-item"><span style="font-size:1rem;">💨</span><div><div class="wx-val">${Math.round(c.wind_speed_10m)} km/h</div><div class="wx-lbl">Viento ${windDir(c.wind_direction_10m)}</div></div></div>
+            <div class="wx-item"><span style="font-size:1rem;">🌧️</span><div><div class="wx-val">${c.precipitation} mm</div><div class="wx-lbl">Precipitación</div></div></div>
+            <div class="wx-item"><span style="font-size:1rem;">🧭</span><div><div class="wx-val">${windDir(c.wind_direction_10m)}</div><div class="wx-lbl">Dirección</div></div></div>
+        </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// DATOS DE SUELO (Open-Meteo)
+// ═══════════════════════════════════════════════════
+function renderSoilData(data) {
+    const now = new Date().getHours();
+    const h   = data.hourly;
+    const sm  = h.soil_moisture_9_to_27cm?.[now] ?? '—';
+    const st  = h.soil_temperature_6cm?.[now]    ?? '—';
+    const t80 = h.temperature_80m?.[now]          ?? '—';
+    const pp  = h.precipitation_probability?.[now]?? '—';
+
+    document.getElementById('soil-box').innerHTML = `
+        <div class="soil-item"><div class="soil-val">${typeof sm==='number'?sm.toFixed(3):sm}</div><div class="soil-lbl">Humedad Suelo<br>9-27 cm (m³/m³)</div></div>
+        <div class="soil-item"><div class="soil-val">${typeof st==='number'?st.toFixed(1)+'°':st}</div><div class="soil-lbl">Temp Suelo<br>6 cm</div></div>
+        <div class="soil-item"><div class="soil-val">${typeof t80==='number'?t80.toFixed(1)+'°':t80}</div><div class="soil-lbl">Temp Aire<br>80 m altura</div></div>
+        <div class="soil-item"><div class="soil-val">${pp}%</div><div class="soil-lbl">Prob.<br>Precipitación</div></div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// ÍNDICES DE RIESGO (calculados con datos reales)
+// ═══════════════════════════════════════════════════
+function updateRiesgo(data) {
+    const now = new Date().getHours();
+    const h   = data.hourly;
+    const c   = data.current;
+
+    const hum  = c.relative_humidity_2m;
+    const temp = c.temperature_2m;
+    const wind = c.wind_speed_10m;
+    const sm   = h.soil_moisture_9_to_27cm?.[now] ?? 0.2;
+    const st   = h.soil_temperature_6cm?.[now]    ?? 25;
+
+    // Riesgo incendio
+    const ri = Math.min(100, Math.max(0, (100-hum)*0.45 + (temp-20)*1.8 + wind*0.7 + (1-sm*10)*10));
+    setRiesgoBar('ri', ri, ['BAJO','MODERADO','ALTO','EXTREMO'], ['var(--green)','var(--accent2)','var(--accent)','var(--red)']);
+
+    // Humedad suelo (convertir m³/m³ → porcentaje aprox)
+    const smPct = Math.min(100, sm * 400);
+    setRiesgoBar('hs', smPct, ['MUY BAJO','BAJO','MEDIO','ALTO'], ['var(--red)','var(--accent2)','var(--accent2)','var(--green)']);
+
+    // Factor viento
+    const fv = Math.min(100, wind*2.2);
+    setRiesgoBar('fv', fv, ['BAJO','MODERADO','ALTO','MUY ALTO'], ['var(--green)','var(--accent2)','var(--accent)','var(--red)']);
+
+    // Temp suelo
+    const tsPct = Math.min(100, (st/50)*100);
+    setRiesgoBar('ts', tsPct, ['FRÍO','TEMPLADO','CÁLIDO','CALIENTE'], ['var(--blue)','var(--green)','var(--accent2)','var(--red)']);
+
+    // Badge global
+    const badge = document.getElementById('riesgo-badge');
+    if      (ri>80) { badge.textContent='EXTREMO'; badge.style.background='rgba(214,48,49,.2)';  badge.style.color='var(--red)';    }
+    else if (ri>60) { badge.textContent='ALTO';    badge.style.background='rgba(232,93,4,.15)';  badge.style.color='var(--accent)'; }
+    else if (ri>40) { badge.textContent='MODERADO';badge.style.background='rgba(244,140,6,.15)'; badge.style.color='var(--accent2)';}
+    else            { badge.textContent='BAJO';    badge.style.background='rgba(0,184,148,.15)'; badge.style.color='var(--green)';  }
+}
+
+function setRiesgoBar(id, pct, labels, colors) {
+    const idx = pct>75?3:pct>50?2:pct>25?1:0;
+    document.getElementById(id+'-bar').style.width = pct.toFixed(0)+'%';
+    document.getElementById(id+'-lbl').textContent  = labels[idx];
+    document.getElementById(id+'-lbl').style.color  = colors[idx];
+}
+
+// ═══════════════════════════════════════════════════
+// PRONÓSTICO
+// ═══════════════════════════════════════════════════
+function renderForecast(data) {
+    const d     = data.daily;
+    const today = new Date();
+    const DAYS  = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+    document.getElementById('forecast-row').innerHTML = d.time.slice(0,5).map((date,i) => {
+        const w = wmo(d.weather_code[i]);
+        const dayName = i===0 ? 'HOY' : DAYS[new Date(date+'T12:00:00').getDay()];
+        return `
+        <div class="fc-day">
+            <div class="fd-name">${dayName}</div>
+            <div class="fd-icon">${w.icon}</div>
+            <div class="fd-hi">${Math.round(d.temperature_2m_max[i])}°</div>
+            <div class="fd-lo">${Math.round(d.temperature_2m_min[i])}°</div>
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// GRÁFICAS
+// ═══════════════════════════════════════════════════
+function buildTempChart(data) {
+    const now    = new Date().getHours();
+    const temps  = data.hourly.temperature_2m.slice(now-11, now+1);
+    const ap_tmp = data.hourly.apparent_temperature?.slice(now-11, now+1) ?? [];
+    const labels = Array.from({length:12},(_,i) => `${(now-11+i+24)%24}h`);
+
+    if (tempChartInst) tempChartInst.destroy();
+    tempChartInst = new Chart(document.getElementById('tempChart'), {
+        type:'line',
+        data:{
+            labels,
+            datasets:[
+                {
+                    label:'Temperatura',
+                    data: temps,
+                    borderColor:'#f48c06', backgroundColor:'rgba(244,140,6,.08)',
+                    borderWidth:2, fill:true, tension:0.4, pointRadius:2,
+                    pointBackgroundColor:'#f48c06',
+                },
+                {
+                    label:'Sensación',
+                    data: ap_tmp,
+                    borderColor:'#e17055', backgroundColor:'transparent',
+                    borderWidth:1.5, borderDash:[4,3], tension:0.4, pointRadius:0,
+                },
+            ]
+        },
+        options:{
+            plugins:{ legend:{ display:true, labels:{ color:'#4a6080', font:{size:9}, boxWidth:12 } } },
+            scales:{
+                x:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ color:'#162840' } },
+                y:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ color:'#162840' } },
+            },
+            responsive:true, maintainAspectRatio:true,
+        }
+    });
+}
+
+function buildFocosChart(alta, media, baja) {
+    const now  = new Date().getHours();
+    const HORAS = Array.from({length:12},(_,i) => `${(now-11+i+24)%24}h`);
+
+    // Simular distribución temporal basada en datos reales
+    const total = alta+media+baja;
+    const factor = total/150;
+    const vals = [8,14,22,35,50,68,85,100,115,125,135,total].map(v => Math.round(v*factor));
+
+    if (focosChartInst) focosChartInst.destroy();
+    focosChartInst = new Chart(document.getElementById('focosChart'), {
+        type:'bar',
+        data:{
+            labels: HORAS,
+            datasets:[{
+                data: vals,
+                backgroundColor: vals.map((_,i) => i<4?'rgba(249,202,36,.6)':i<8?'rgba(232,93,4,.6)':'rgba(214,48,49,.6)'),
+                borderRadius:3,
+            }]
+        },
+        options:{
+            plugins:{ legend:{ display:false } },
+            scales:{
+                x:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ display:false } },
+                y:{ ticks:{ color:'#4a6080', font:{size:8} }, grid:{ color:'#162840' } },
+            },
+            responsive:true, maintainAspectRatio:true,
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// KML LOADER — PROVINCIAS, MUNICIPIOS, TCO, COMUNIDADES
+// ═══════════════════════════════════════════════════
+function handleKMLFiles(event) {
+    const tipo   = document.getElementById('kml-tipo').value;
+    const nombre = document.getElementById('kml-nombre').value.trim();
+    Array.from(event.target.files).forEach((file, i) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const name = nombre || file.name.replace(/\.(kml|kmz)$/i,'');
+            loadKMLContent(e.target.result, name + (event.target.files.length>1?` (${i+1})`:''), tipo);
+        };
+        reader.readAsText(file);
+    });
+    event.target.value = ''; // reset input
+}
+
+function loadKMLContent(content, name, tipo) {
+    try {
+        const id    = 'kml_' + (++kmlIdSeq);
+        const color = CFG.KML_COLORS[tipo] || CFG.KML_COLORS.otro;
+
+        const layer = omnivore.kml.parse(content);
+
+        layer.eachLayer(l => {
+            if (l.setStyle) {
+                l.setStyle({ color, fillColor:color, fillOpacity:0.12, weight:2 });
+            }
+            // Popup con nombre de feature
+            if (l.feature?.properties) {
+                const props = l.feature.properties;
+                const fname = props.name || props.Name || props.nombre || name;
+                l.bindPopup(`
+                    <div style="font-size:.78rem;">
+                        <div style="color:${color};font-weight:700;margin-bottom:6px;">
+                            ${tipoLabel(tipo)} ${fname}
+                        </div>
+                        ${Object.entries(props)
+                            .filter(([k]) => !['styleUrl','description'].includes(k))
+                            .slice(0,8)
+                            .map(([k,v]) => `<div style="font-size:.7rem;"><span style="color:var(--dim);">${k}:</span> ${v}</div>`)
+                            .join('')}
+                    </div>`);
+            }
+        });
+
+        // Agregar al grupo correspondiente
+        layer.addTo(kmlGroups[tipo]);
+        if (!map.hasLayer(kmlGroups[tipo])) {
+            kmlGroups[tipo].addTo(map);
+        }
+
+        // Habilitar botón del tipo
+        const btn = document.getElementById('btn-kml-'+tipo);
+        if (btn) { btn.disabled = false; btn.classList.add('active'); }
+
+        // Hacer zoom
+        try { map.fitBounds(layer.getBounds()); } catch(e) {}
+
+        kmlStore[id] = { layer, name, tipo, color, visible:true };
+        renderKMLList();
+        updateKMLLegend();
+
+    } catch(err) {
+        alert('Error al procesar KML: ' + err.message);
+    }
+}
+
+function tipoLabel(tipo) {
+    return { prov:'🗂️ Provincia:', mun:'🏘️ Municipio:', tco:'🌿 TCO:', com:'🏡 Comunidad:', otro:'📄' }[tipo]||'📄';
+}
+
+function loadKMLFromURL() {
+    const url    = document.getElementById('kml-url').value.trim();
+    const tipo   = document.getElementById('kml-tipo').value;
+    const nombre = document.getElementById('kml-nombre').value.trim() || url.split('/').pop();
+    if (!url) return;
+
+    const id    = 'kml_' + (++kmlIdSeq);
+    const color = CFG.KML_COLORS[tipo] || CFG.KML_COLORS.otro;
+    const layer = omnivore.kml(url);
+
+    layer.on('ready', () => {
+        layer.eachLayer(l => {
+            if (l.setStyle) l.setStyle({ color, fillColor:color, fillOpacity:0.12, weight:2 });
+        });
+        try { map.fitBounds(layer.getBounds()); } catch(e) {}
+        layer.addTo(kmlGroups[tipo]);
+        if (!map.hasLayer(kmlGroups[tipo])) kmlGroups[tipo].addTo(map);
+        const btn = document.getElementById('btn-kml-'+tipo);
+        if (btn) { btn.disabled=false; btn.classList.add('active'); }
+        kmlStore[id] = { layer, name:nombre, tipo, color, visible:true };
+        renderKMLList();
+        updateKMLLegend();
+    });
+    layer.on('error', () => alert('No se pudo cargar el KML desde URL'));
+    document.getElementById('kml-url').value = '';
+}
+
+function loadDemoKML() {
+    // Demo: Chiquitanía + Comunidades Beni
+    const demos = [
+        {
+            tipo:'prov',
+            name:'Provincia Ñuflo de Chávez (Demo)',
+            content:`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Prov Ñuflo de Chávez</name>
+<Placemark><name>Ñuflo de Chávez</name><description>Provincia Santa Cruz</description>
+<Polygon><outerBoundaryIs><LinearRing><coordinates>
+-62.0,-14.5,0 -58.5,-14.5,0 -58.5,-17.5,0 -62.0,-17.5,0 -62.0,-14.5,0
+</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document></kml>`
+        },
+        {
+            tipo:'tco',
+            name:'TCO Monteverde (Demo)',
+            content:`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>TCO Monteverde</name>
+<Placemark><name>TCO Monteverde</name><description>Territorio Comunitario de Origen</description>
+<Polygon><outerBoundaryIs><LinearRing><coordinates>
+-64.5,-14.0,0 -63.5,-14.0,0 -63.5,-15.0,0 -64.5,-15.0,0 -64.5,-14.0,0
+</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document></kml>`
+        },
+        {
+            tipo:'com',
+            name:'Comunidad San Miguel (Demo)',
+            content:`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Comunidades</name>
+<Placemark><name>Com. San Miguel</name><Point><coordinates>-63.8,-15.5,0</coordinates></Point></Placemark>
+<Placemark><name>Com. El Carmen</name><Point><coordinates>-63.2,-14.8,0</coordinates></Point></Placemark>
+<Placemark><name>Com. Santa Rosa</name><Point><coordinates>-64.1,-15.2,0</coordinates></Point></Placemark>
+</Document></kml>`
+        }
+    ];
+    demos.forEach(d => loadKMLContent(d.content, d.name, d.tipo));
+}
+
+function renderKMLList() {
+    const entries = Object.entries(kmlStore);
+    const el = document.getElementById('kml-layers-list');
+    if (!entries.length) { el.innerHTML=''; return; }
+
+    el.innerHTML = entries.map(([id, k]) => `
+        <div class="kml-item" id="kitem-${id}">
+            <div class="kml-item-left">
+                <div class="kml-swatch" style="background:${k.color};"></div>
+                <span class="kml-name" title="${k.name}">${tipoLabel(k.tipo)} ${k.name}</span>
+            </div>
+            <div class="kml-ctls">
+                <button class="kbtn" onclick="toggleKMLItem('${id}',this)" title="${k.visible?'Ocultar':'Mostrar'}">${k.visible?'👁️':'🚫'}</button>
+                <button class="kbtn" onclick="zoomKML('${id}')"  title="Zoom">🎯</button>
+                <button class="kbtn del" onclick="removeKML('${id}')" title="Eliminar">✕</button>
+            </div>
+        </div>`).join('');
+}
+
+function toggleKMLItem(id, btn) {
+    const k = kmlStore[id];
+    if (!k) return;
+    if (k.visible) {
+        kmlGroups[k.tipo].removeLayer(k.layer);
+        k.visible = false; btn.textContent='🚫';
+    } else {
+        k.layer.addTo(kmlGroups[k.tipo]);
+        k.visible = true; btn.textContent='👁️';
+    }
+}
+
+function zoomKML(id) {
+    try { map.fitBounds(kmlStore[id].layer.getBounds()); } catch(e){}
+}
+
+function removeKML(id) {
+    const k = kmlStore[id];
+    if (!k) return;
+    kmlGroups[k.tipo].removeLayer(k.layer);
+    delete kmlStore[id];
+    renderKMLList();
+    updateKMLLegend();
+}
+
+function updateKMLLegend() {
+    const items = Object.values(kmlStore);
+    const el    = document.getElementById('kml-legend-items');
+    if (!items.length) { el.textContent='Sin capas cargadas'; return; }
+    el.innerHTML = items.map(k => `
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+            <div style="width:8px;height:8px;border-radius:1px;background:${k.color};flex-shrink:0;"></div>
+            <span>${k.name}</span>
+        </div>`).join('');
+}
+
+// Drag & drop
+const dropEl = document.getElementById('kml-drop');
+dropEl.addEventListener('dragover',  e => { e.preventDefault(); dropEl.classList.add('dragover'); });
+dropEl.addEventListener('dragleave', ()  => dropEl.classList.remove('dragover'));
+dropEl.addEventListener('drop', e => {
+    e.preventDefault(); dropEl.classList.remove('dragover');
+    const tipo   = document.getElementById('kml-tipo').value;
+    const nombre = document.getElementById('kml-nombre').value.trim();
+    Array.from(e.dataTransfer.files).filter(f => /\.(kml|kmz)$/i.test(f.name)).forEach((file,i) => {
+        const reader = new FileReader();
+        reader.onload = ev => loadKMLContent(ev.target.result, nombre||file.name.replace(/\.(kml|kmz)$/i,''), tipo);
+        reader.readAsText(file);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ESTACIONES EN MAPA
+// ═══════════════════════════════════════════════════
+function addEstaciones() {
+    const ests = [
+        { lat:-16.495,  lng:-68.133, nombre:'La Paz'    },
+        { lat:-17.7863, lng:-63.1812,nombre:'Santa Cruz'},
+        { lat:-17.393,  lng:-66.157, nombre:'Cochabamba'},
+        { lat:-14.832,  lng:-64.898, nombre:'Trinidad'  },
+        { lat:-10.997,  lng:-66.071, nombre:'Riberalta' },
+        { lat:-11.026,  lng:-68.742, nombre:'Cobija'    },
+        { lat:-19.033,  lng:-65.262, nombre:'Sucre'     },
+        { lat:-19.586,  lng:-65.753, nombre:'Potosí'    },
+        { lat:-17.963,  lng:-67.112, nombre:'Oruro'     },
+        { lat:-21.535,  lng:-64.729, nombre:'Tarija'    },
+    ];
+    ests.forEach(e => {
+        const icon = L.divIcon({
+            html:`<div style="background:#0a1628;border:2px solid #0984e3;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 0 8px rgba(9,132,227,.4);">📡</div>`,
+            className:'', iconSize:[20,20], iconAnchor:[10,10],
+        });
+        L.marker([e.lat, e.lng], { icon })
+            .addTo(LG.est)
+            .bindPopup(`<b style="color:#0984e3;">📡 ${e.nombre}</b><br><small>Estación meteorológica</small>`);
+    });
+}
+addEstaciones();
+
+// ═══════════════════════════════════════════════════
+// EXPORTAR CSV
+// ═══════════════════════════════════════════════════
+function exportCSV() {
+    if (!focosData.length) { alert('No hay datos de focos cargados.'); return; }
+    const rows = [
+        ['latitud','longitud','brillo_K','FRP_MW','intensidad','satelite','confianza','fecha','hora'],
+        ...focosData.map(f => [
+            f.lat, f.lng, f.brightness.toFixed(1), f.frp.toFixed(1),
+            getIntensidad(f.brightness), f.satellite, f.confidence, f.fecha, f.hora
+        ])
+    ];
+    const csv  = rows.map(r=>r.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+        href:url, download:`focos_bolivia_${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click(); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════
+// API STATUS
+// ═══════════════════════════════════════════════════
+function setAPIStatus(api, status, text) {
+    const d = document.getElementById('d-'+api);
+    const t = document.getElementById('t-'+api);
+    if (!d||!t) return;
+    d.className = `dot ${status}`;
+    t.textContent = text;
+    t.style.color = status==='ok'?'var(--green)':status==='err'?'var(--red)':'var(--accent2)';
+}
+
+// ═══════════════════════════════════════════════════
+// RELOJ
+// ═══════════════════════════════════════════════════
+function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleString('es-BO', {
+        timeZone:'America/La_Paz', day:'2-digit', month:'2-digit', year:'numeric',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════════
+// REFRESH
+// ═══════════════════════════════════════════════════
+async function refreshFocos() {
+    await fetchFocosNASA();
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+async function init() {
+    // Clima Santa Cruz (tus coordenadas exactas de Open-Meteo)
+    await fetchClima('Santa Cruz de la Sierra', null);
+    // Focos NASA FIRMS con tu key real
+    await fetchFocosNASA();
+    // Auto-refresh cada 10 min
+    setInterval(refreshFocos, 10*60*1000);
+    setInterval(() => fetchClima('Santa Cruz de la Sierra', null), 30*60*1000);
+}
+
+init();
+</script>
+</body>
+</html>
