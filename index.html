@@ -1000,6 +1000,40 @@ function toggleKMLGroup(tipo, btn) {
 let focosVentana = 24;   // horas activas: 24, 48 o 72
 let focosDataRaw = [];   // todos los focos crudos (72h)
 
+// ═══════════════════════════════════════════════════
+// POLÍGONO SIMPLIFICADO DE BOLIVIA — filtro geográfico
+// ═══════════════════════════════════════════════════
+// Polígono de Bolivia con ~40 vértices (simplificado pero preciso para excluir
+// países vecinos como Paraguay, Brasil, Perú, Chile, Argentina)
+const BOLIVIA_POLYGON = [
+    [-69.5,-16.7],[-69.6,-17.5],[-69.3,-18.2],[-68.9,-18.9],[-68.5,-19.4],
+    [-68.2,-20.1],[-67.9,-20.7],[-67.5,-21.5],[-67.0,-22.0],[-66.5,-22.3],
+    [-65.8,-22.4],[-65.0,-22.0],[-64.5,-22.5],[-63.7,-22.0],[-63.0,-21.8],
+    [-62.5,-21.5],[-62.0,-20.8],[-61.5,-20.0],[-60.8,-19.5],[-60.0,-19.3],
+    [-59.5,-18.9],[-58.5,-18.0],[-58.2,-17.5],[-58.0,-16.0],[-57.8,-14.5],
+    [-57.5,-13.5],[-57.8,-12.5],[-58.2,-11.5],[-59.0,-10.5],[-60.0,-10.0],
+    [-61.0,-9.7], [-62.0,-9.9], [-63.0,-10.2],[-64.0,-10.5],[-65.0,-10.8],
+    [-66.0,-11.0],[-67.0,-11.0],[-68.0,-11.2],[-68.7,-11.8],[-69.2,-12.5],
+    [-69.5,-13.5],[-69.6,-14.5],[-69.5,-15.5],[-69.5,-16.7]
+];
+
+function isEnBolivia(lat, lng) {
+    if (isNaN(lat) || isNaN(lng)) return false;
+    // Primero bbox rápido
+    if (lat < -22.9 || lat > -9.7 || lng < -69.6 || lng > -57.5) return false;
+    // Luego ray-casting sobre polígono simplificado
+    let inside = false;
+    const poly = BOLIVIA_POLYGON;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i][0], yi = poly[i][1];
+        const xj = poly[j][0], yj = poly[j][1];
+        const intersect = ((yi > lat) !== (yj > lat)) &&
+            (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 async function fetchFocosNASA() {
     const { west, south, east, north } = CFG.BBOX;
     // Pedimos 3 días para tener 24h / 48h / 72h disponibles sin volver a pedir
@@ -1034,13 +1068,8 @@ async function fetchFocosNASA() {
                     edadH:      isNaN(dt) ? 0 : (ahora - dt) / 3600000,
                 };
             })
-            // Filtro estricto dentro del territorio boliviano
-            .filter(f => {
-                const { west, south, east, north } = CFG.BBOX;
-                return !isNaN(f.lat) && !isNaN(f.lng)
-                    && f.lat >= south && f.lat <= north
-                    && f.lng >= west  && f.lng <= east;
-            });
+            // Filtro estricto dentro del territorio boliviano (polígono simplificado)
+            .filter(f => isEnBolivia(f.lat, f.lng));
 
         setAPIStatus('nasa', 'ok', `${focosDataRaw.length} focos (72h) ✓`);
         aplicarVentana();
@@ -1135,6 +1164,9 @@ function useDemoFocos() {
         });
     }
 
+    // Aplicar mismo filtro de polígono boliviano al modo demo
+    focosDataRaw = focosDataRaw.filter(f => isEnBolivia(f.lat, f.lng));
+
     setAPIStatus('nasa', 'warn', 'Modo demo activo');
     aplicarVentana();
     actualizarUltimaActualizacion();
@@ -1143,6 +1175,13 @@ function useDemoFocos() {
 // ═══════════════════════════════════════════════════
 // RENDER FOCOS EN MAPA — color por antigüedad
 // ═══════════════════════════════════════════════════
+// Intensidad por temperatura de brillo (K)
+function getIntensidad(brightness) {
+    if (brightness >= 380) return 'alta';
+    if (brightness >= 310) return 'media';
+    return 'baja';
+}
+
 function getColorPorEdad(edadH) {
     // 0-6h → rojo vivo · 6-24h → naranja · 24-48h → amarillo · 48-72h → gris claro
     if (edadH <= 6)  return { color:'#ff0000', fill:'#ff2200', r:9,  label:'< 6 h'    };
@@ -2190,8 +2229,18 @@ function abrirReporte() {
     poblarReporte();
     document.getElementById('reporte-overlay').style.display = 'block';
 
-    // Iniciar mapa del reporte con un pequeño delay para que el DOM esté visible
-    setTimeout(iniciarMapaReporte, 200);
+    // Limpiar mapa anterior antes de crear uno nuevo
+    if (reporteMapInst) {
+        try { reporteMapInst.remove(); } catch(e) {}
+        reporteMapInst = null;
+        reporteMapFocosLG = null;
+    }
+    // Restaurar loading overlay
+    const loading = document.getElementById('rpt-mapa-loading');
+    if (loading) loading.style.display = 'flex';
+
+    // Dar tiempo al modal para renderizarse completamente
+    setTimeout(iniciarMapaReporte, 350);
 }
 
 function iniciarMapaReporte() {
@@ -2199,18 +2248,30 @@ function iniciarMapaReporte() {
     if (!container) return;
 
     if (reporteMapInst) {
-        reporteMapInst.remove();
+        try { reporteMapInst.remove(); } catch(e) {}
         reporteMapInst = null;
+        reporteMapFocosLG = null;
     }
 
-    reporteMapInst = L.map('rpt-mapa', { zoomControl:true, attributionControl:false });
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(reporteMapInst);
+    reporteMapInst = L.map('rpt-mapa', {
+        zoomControl: true,
+        attributionControl: false,
+        scrollWheelZoom: true
+    });
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18
+    }).addTo(reporteMapInst);
 
     reporteMapFocosLG = L.layerGroup().addTo(reporteMapInst);
-    renderFocosEnMapaReporte();
 
-    const loading = document.getElementById('rpt-mapa-loading');
-    if (loading) loading.style.display = 'none';
+    // Forzar recálculo de dimensiones después de que el DOM esté visible
+    setTimeout(() => {
+        reporteMapInst.invalidateSize(true);
+        renderFocosEnMapaReporte();
+        const loading = document.getElementById('rpt-mapa-loading');
+        if (loading) loading.style.display = 'none';
+    }, 300);
 }
 
 function renderFocosEnMapaReporte() {
@@ -2221,45 +2282,62 @@ function renderFocosEnMapaReporte() {
     const kmlId  = sel ? sel.value : '';
     let datos = getFocosParaReporte(kmlId);
 
+    // Dibujar focos por color de antigüedad
     datos.forEach(f => {
         const cfg = getColorPorEdad(f.edadH ?? 0);
         L.circleMarker([f.lat, f.lng], {
             radius: Math.max(3, cfg.r - 2),
             color: cfg.color, fillColor: cfg.fill,
             fillOpacity: 0.85, weight: 1,
-        }).addTo(reporteMapFocosLG);
+        }).bindTooltip(`🔥 ${cfg.label} · FRP ${f.frp.toFixed(0)} MW`, { direction:'top' })
+          .addTo(reporteMapFocosLG);
     });
 
-    // Dibujar KML seleccionado si hay
+    // Dibujar TODAS las capas KML cargadas sobre el mapa del reporte
+    // (primero limpiar las ya añadidas anteriormente)
+    if (reporteMapInst._kmlOverlays) {
+        reporteMapInst._kmlOverlays.forEach(l => { try { reporteMapInst.removeLayer(l); } catch(e){} });
+    }
+    reporteMapInst._kmlOverlays = [];
+
+    Object.entries(kmlStore).forEach(([id, k]) => {
+        if (!k.layer) return;
+        try {
+            const kmlClone = L.geoJSON(k.layer.toGeoJSON(), {
+                style: { color: k.color, fillColor: k.color, fillOpacity: kmlId === id ? 0.2 : 0.08, weight: kmlId === id ? 2.5 : 1.5 },
+                pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius:6, color:k.color, fillColor:k.color, fillOpacity:0.6, weight:1 })
+            }).addTo(reporteMapInst);
+            reporteMapInst._kmlOverlays.push(kmlClone);
+        } catch(e) {}
+    });
+
+    // Ajustar vista
     if (kmlId && kmlStore[kmlId]) {
         try {
             const bounds = kmlStore[kmlId].layer.getBounds();
             if (bounds && bounds.isValid()) {
-                reporteMapInst.fitBounds(bounds.pad(0.1));
+                reporteMapInst.fitBounds(bounds.pad(0.15));
+            } else {
+                reporteMapInst.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]);
             }
         } catch(e) { reporteMapInst.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]); }
-        // Re-añadir capa KML semitransparente
-        const k = kmlStore[kmlId];
-        try {
-            const kmlClone = L.geoJSON(kmlStore[kmlId].layer.toGeoJSON(), {
-                style: { color: k.color, fillColor: k.color, fillOpacity: 0.15, weight: 2 }
-            }).addTo(reporteMapInst);
-        } catch(e) {}
     } else {
         reporteMapInst.fitBounds([[-22.9,-69.6],[-9.7,-57.5]]);
     }
 
     const nota = document.getElementById('rpt-mapa-nota');
-    if (nota) nota.textContent = `${datos.length} focos mostrados · Ventana: ${focosVentana}h · Base: ESRI World Imagery`;
+    if (nota) nota.textContent = `${datos.length} focos mostrados · Ventana: ${focosVentana}h · ${Object.keys(kmlStore).length} capa(s) KML · Base: ESRI World Imagery`;
 }
 
 function cerrarReporte() {
     document.getElementById('reporte-overlay').style.display = 'none';
     if (reporteMapInst) {
-        reporteMapInst.remove();
+        try { reporteMapInst.remove(); } catch(e) {}
         reporteMapInst = null;
+        reporteMapFocosLG = null;
     }
-    document.getElementById('rpt-mapa-loading').style.display = 'flex';
+    const loading = document.getElementById('rpt-mapa-loading');
+    if (loading) loading.style.display = 'flex';
 }
 
 // ═══════════════════════════════════════════════════
@@ -2470,33 +2548,65 @@ function poblarReporte() {
     const kmlEntries = Object.values(kmlStore);
     const tipoLabels = { prov:'Provincia', mun:'Municipio', tco:'TCO', com:'Comunidad', otro:'Otro' };
     if (kmlEntries.length) {
-        document.getElementById('rpt-kml').innerHTML = `
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
-            ${kmlEntries.map(k => {
-                let focosEnCapa = 0;
-                try {
-                    const bounds = k.layer.getBounds();
-                    if (bounds && bounds.isValid()) {
-                        focosEnCapa = focosData.filter(f =>
-                            f.lat >= bounds.getSouth() && f.lat <= bounds.getNorth() &&
-                            f.lng >= bounds.getWest()  && f.lng <= bounds.getEast()
-                        ).length;
+        // Construir resumen detallado por capa
+        const kmlHTML = kmlEntries.map(k => {
+            let focosEnCapa = 0;
+            let focosAltaEnCapa = 0;
+            let featuresCount = 0;
+            let featureNames = [];
+            try {
+                const bounds = k.layer.getBounds();
+                if (bounds && bounds.isValid()) {
+                    const s=bounds.getSouth(), n=bounds.getNorth(), w=bounds.getWest(), e=bounds.getEast();
+                    const focosC = focosData.filter(f => f.lat>=s && f.lat<=n && f.lng>=w && f.lng<=e);
+                    focosEnCapa = focosC.length;
+                    focosAltaEnCapa = focosC.filter(f => getIntensidad(f.brightness)==='alta').length;
+                }
+                // Contar features y nombres
+                k.layer.eachLayer(l => {
+                    featuresCount++;
+                    const p = l.feature?.properties;
+                    if (p) {
+                        const nm = p.name||p.Name||p.nombre||p.NOMBRE||p.NOM||'';
+                        if (nm && featureNames.length < 5) featureNames.push(nm);
                     }
-                } catch(e) {}
-                const isSelected = kmlId && kmlStore[kmlId] && kmlStore[kmlId] === k;
-                return `
-                <div style="background:#123b2a;border-radius:6px;padding:10px 12px;border-left:3px solid ${k.color};${isSelected?'box-shadow:0 0 0 2px '+k.color+';':''}">
-                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-                        <div style="width:8px;height:8px;border-radius:2px;background:${k.color};flex-shrink:0;"></div>
-                        <span style="font-weight:600;color:#fff;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${k.name}</span>
+                });
+            } catch(e) {}
+
+            const nivelColor = focosAltaEnCapa>5?'#c62828':focosEnCapa>10?'#e65100':focosEnCapa>0?'#f9a825':'#2e7d32';
+            const nivelLabel = focosAltaEnCapa>5?'🔴 CRÍTICO':focosEnCapa>10?'🟠 ALTO':focosEnCapa>0?'🟡 MODERADO':'🟢 SIN FOCOS';
+            return `
+            <div style="background:#123b2a;border-radius:8px;padding:12px 14px;border-left:4px solid ${k.color};margin-bottom:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:10px;height:10px;border-radius:2px;background:${k.color};flex-shrink:0;"></div>
+                        <span style="font-weight:700;color:#fff;font-size:.82rem;">${k.name}</span>
+                        <span style="font-size:.6rem;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.07);color:#a5d6a7;">${tipoLabels[k.tipo]||k.tipo}</span>
                     </div>
-                    <div style="font-size:.65rem;color:#81c784;">Tipo: ${tipoLabels[k.tipo]||k.tipo}</div>
-                    <div style="font-size:.65rem;color:${focosEnCapa>0?'#ff6b6b':'#66bb6a'};margin-top:3px;">
-                        ${focosEnCapa > 0 ? '🔥 '+focosEnCapa+' focos en área' : '✅ Sin focos en área'}
+                    <span style="font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.05);color:${nivelColor};">${nivelLabel}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+                    <div style="background:rgba(255,255,255,.04);border-radius:5px;padding:8px;text-align:center;">
+                        <div style="font-size:1.4rem;font-weight:700;color:${focosEnCapa>0?'#ff6b6b':'#66bb6a'};">${focosEnCapa}</div>
+                        <div style="font-size:.58rem;color:#81c784;text-transform:uppercase;margin-top:2px;">Total focos</div>
                     </div>
-                </div>`;
-            }).join('')}
+                    <div style="background:rgba(255,255,255,.04);border-radius:5px;padding:8px;text-align:center;">
+                        <div style="font-size:1.4rem;font-weight:700;color:${focosAltaEnCapa>0?'#c62828':'#66bb6a'};">${focosAltaEnCapa}</div>
+                        <div style="font-size:.58rem;color:#81c784;text-transform:uppercase;margin-top:2px;">Alta intensidad</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,.04);border-radius:5px;padding:8px;text-align:center;">
+                        <div style="font-size:1.4rem;font-weight:700;color:#74b9ff;">${featuresCount}</div>
+                        <div style="font-size:.58rem;color:#81c784;text-transform:uppercase;margin-top:2px;">Entidades KML</div>
+                    </div>
+                </div>
+                ${featureNames.length ? `
+                <div style="font-size:.62rem;color:#81c784;margin-top:4px;">
+                    <span style="color:#a5d6a7;">Entidades:</span> ${featureNames.join(' · ')}${featuresCount>5?' · ...':''}
+                </div>` : ''}
             </div>`;
+        }).join('');
+
+        document.getElementById('rpt-kml').innerHTML = kmlHTML;
     } else {
         document.getElementById('rpt-kml').innerHTML = '<span style="color:#81c784;">No hay capas KML cargadas. Carga archivos KML/KMZ en el panel derecho para incluirlas en el reporte.</span>';
     }
